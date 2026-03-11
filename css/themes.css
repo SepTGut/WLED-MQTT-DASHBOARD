@@ -1,0 +1,269 @@
+/* ═══════════════════════════════════════════════════════
+   themes.css
+   ─ Six switchable color themes
+   ─ Applied via  data-theme="..."  on <html>
+   ─ All values defined as CSS custom properties,
+     so components in layout.css automatically update.
+   ═══════════════════════════════════════════════════════
+
+   Palette anatomy:
+     --color-bg          page background
+     --color-surface     card / panel background
+     --color-surface-2   nested surface (e.g. inner card)
+     --color-border      dividers, outlines
+     --color-text        primary text
+     --color-text-muted  secondary / placeholder text
+     --color-accent      brand accent (buttons, active states)
+     --color-accent-dim  15% opacity of accent (hover glow)
+     --color-success     green signals
+     --color-danger      red signals
+     --color-relay-on    relay ON indicator
+     --color-relay-off   relay OFF indicator
+     --color-sensor-on   sensor active glow
+*/
+
+/* ── 1. DARK (default) ──────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg:          #0f1117;
+  --color-surface:     #1a1d27;
+  --color-surface-2:   #22263a;
+  --color-border:      #2e3347;
+  --color-text:        #e8eaf6;
+  --color-text-muted:  #7b82a8;
+  --color-accent:      #6c8aff;
+  --color-accent-dim:  rgba(108,138,255,.15);
+  --color-success:     #3dd68c;
+  --color-danger:      #f06a6a;
+  --color-relay-on:    #3dd68c;
+  --color-relay-off:   #3a3f58;
+  --color-sensor-on:   #38d4d4;
+
+  /* Header */
+  --header-bg:         #141720;
+  --header-border:     #23273b;
+
+  /* Bottom nav */
+  --bnav-bg:           #141720;
+  --bnav-border:       #23273b;
+  --bnav-active:       var(--color-accent);
+
+  /* Toggle */
+  --toggle-track-off:  #2e3347;
+  --toggle-track-on:   var(--color-accent);
+  --toggle-knob:       #ffffff;
+
+  /* Slider */
+  --slider-track:      #2e3347;
+  --slider-thumb:      var(--color-accent);
+
+  /* Log */
+  --log-bg:            #0d1018;
+  --log-text:          #8892c8;
+  --log-info:          #6c8aff;
+  --log-success:       #3dd68c;
+  --log-warning:       #f5c842;
+  --log-error:         #f06a6a;
+}
+
+/* ── 2. LIGHT ────────────────────────────────────────── */
+[data-theme="light"] {
+  --color-bg:          #f5f6fa;
+  --color-surface:     #ffffff;
+  --color-surface-2:   #f0f2f8;
+  --color-border:      #dde0eb;
+  --color-text:        #1a1d2e;
+  --color-text-muted:  #7480a0;
+  --color-accent:      #4a6bff;
+  --color-accent-dim:  rgba(74,107,255,.12);
+  --color-success:     #22b570;
+  --color-danger:      #e84848;
+  --color-relay-on:    #22b570;
+  --color-relay-off:   #cdd2e4;
+  --color-sensor-on:   #20a8a8;
+
+  --header-bg:         #ffffff;
+  --header-border:     #dde0eb;
+
+  --bnav-bg:           #ffffff;
+  --bnav-border:       #dde0eb;
+  --bnav-active:       var(--color-accent);
+
+  --toggle-track-off:  #c8cedf;
+  --toggle-track-on:   var(--color-accent);
+  --toggle-knob:       #ffffff;
+
+  --slider-track:      #dde0eb;
+  --slider-thumb:      var(--color-accent);
+
+  --log-bg:            #f0f2f8;
+  --log-text:          #4a5278;
+  --log-info:          #4a6bff;
+  --log-success:       #22b570;
+  --log-warning:       #d99000;
+  --log-error:         #e84848;
+
+  /* Lighter shadow for light bg */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.10);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.12);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,.14);
+}
+
+/* ── 3. PURPLE ───────────────────────────────────────── */
+[data-theme="purple"] {
+  --color-bg:          #0e0a1f;
+  --color-surface:     #160f2e;
+  --color-surface-2:   #1e1640;
+  --color-border:      #2d2258;
+  --color-text:        #e8e0ff;
+  --color-text-muted:  #8875c0;
+  --color-accent:      #a855f7;
+  --color-accent-dim:  rgba(168,85,247,.15);
+  --color-success:     #34d399;
+  --color-danger:      #f87171;
+  --color-relay-on:    #a855f7;
+  --color-relay-off:   #2d2258;
+  --color-sensor-on:   #38bdf8;
+
+  --header-bg:         #120d28;
+  --header-border:     #281d55;
+
+  --bnav-bg:           #120d28;
+  --bnav-border:       #281d55;
+  --bnav-active:       var(--color-accent);
+
+  --toggle-track-off:  #2d2258;
+  --toggle-track-on:   var(--color-accent);
+  --toggle-knob:       #ffffff;
+
+  --slider-track:      #2d2258;
+  --slider-thumb:      var(--color-accent);
+
+  --log-bg:            #0a0715;
+  --log-text:          #9088bc;
+  --log-info:          #a855f7;
+  --log-success:       #34d399;
+  --log-warning:       #fbbf24;
+  --log-error:         #f87171;
+}
+
+/* ── 4. OCEAN ────────────────────────────────────────── */
+[data-theme="ocean"] {
+  --color-bg:          #060e1c;
+  --color-surface:     #0c1a2e;
+  --color-surface-2:   #122440;
+  --color-border:      #1a3354;
+  --color-text:        #d0eeff;
+  --color-text-muted:  #5888a8;
+  --color-accent:      #06b6d4;
+  --color-accent-dim:  rgba(6,182,212,.15);
+  --color-success:     #10b981;
+  --color-danger:      #f87171;
+  --color-relay-on:    #06b6d4;
+  --color-relay-off:   #1a3354;
+  --color-sensor-on:   #38bdf8;
+
+  --header-bg:         #07111f;
+  --header-border:     #142235;
+
+  --bnav-bg:           #07111f;
+  --bnav-border:       #142235;
+  --bnav-active:       var(--color-accent);
+
+  --toggle-track-off:  #1a3354;
+  --toggle-track-on:   var(--color-accent);
+  --toggle-knob:       #ffffff;
+
+  --slider-track:      #1a3354;
+  --slider-thumb:      var(--color-accent);
+
+  --log-bg:            #040c18;
+  --log-text:          #4e7898;
+  --log-info:          #06b6d4;
+  --log-success:       #10b981;
+  --log-warning:       #f59e0b;
+  --log-error:         #f87171;
+}
+
+/* ── 5. AMBER ────────────────────────────────────────── */
+[data-theme="amber"] {
+  --color-bg:          #120c04;
+  --color-surface:     #1e1408;
+  --color-surface-2:   #281c0e;
+  --color-border:      #3d2d14;
+  --color-text:        #fef3c7;
+  --color-text-muted:  #9c7c44;
+  --color-accent:      #f59e0b;
+  --color-accent-dim:  rgba(245,158,11,.15);
+  --color-success:     #34d399;
+  --color-danger:      #f87171;
+  --color-relay-on:    #f59e0b;
+  --color-relay-off:   #3d2d14;
+  --color-sensor-on:   #fb923c;
+
+  --header-bg:         #170f06;
+  --header-border:     #2e2010;
+
+  --bnav-bg:           #170f06;
+  --bnav-border:       #2e2010;
+  --bnav-active:       var(--color-accent);
+
+  --toggle-track-off:  #3d2d14;
+  --toggle-track-on:   var(--color-accent);
+  --toggle-knob:       #ffffff;
+
+  --slider-track:      #3d2d14;
+  --slider-thumb:      var(--color-accent);
+
+  --log-bg:            #0e0802;
+  --log-text:          #8c6c34;
+  --log-info:          #f59e0b;
+  --log-success:       #34d399;
+  --log-warning:       #fb923c;
+  --log-error:         #f87171;
+}
+
+/* ── 6. ROSE ─────────────────────────────────────────── */
+[data-theme="rose"] {
+  --color-bg:          #130a10;
+  --color-surface:     #1e1018;
+  --color-surface-2:   #2a1622;
+  --color-border:      #3d1f30;
+  --color-text:        #ffe4ef;
+  --color-text-muted:  #9c5070;
+  --color-accent:      #f43f5e;
+  --color-accent-dim:  rgba(244,63,94,.15);
+  --color-success:     #34d399;
+  --color-danger:      #fb7185;
+  --color-relay-on:    #f43f5e;
+  --color-relay-off:   #3d1f30;
+  --color-sensor-on:   #fb923c;
+
+  --header-bg:         #180c14;
+  --header-border:     #31182a;
+
+  --bnav-bg:           #180c14;
+  --bnav-border:       #31182a;
+  --bnav-active:       var(--color-accent);
+
+  --toggle-track-off:  #3d1f30;
+  --toggle-track-on:   var(--color-accent);
+  --toggle-knob:       #ffffff;
+
+  --slider-track:      #3d1f30;
+  --slider-thumb:      var(--color-accent);
+
+  --log-bg:            #0e0710;
+  --log-text:          #8c4460;
+  --log-info:          #f43f5e;
+  --log-success:       #34d399;
+  --log-warning:       #f59e0b;
+  --log-error:         #fb7185;
+}
+
+/* ── Theme swatch previews ──────────────────────────── */
+.swatch-dark   { background: linear-gradient(135deg, #1a1d27 50%, #6c8aff 50%); }
+.swatch-light  { background: linear-gradient(135deg, #f5f6fa 50%, #4a6bff 50%); }
+.swatch-purple { background: linear-gradient(135deg, #160f2e 50%, #a855f7 50%); }
+.swatch-ocean  { background: linear-gradient(135deg, #0c1a2e 50%, #06b6d4 50%); }
+.swatch-amber  { background: linear-gradient(135deg, #1e1408 50%, #f59e0b 50%); }
+.swatch-rose   { background: linear-gradient(135deg, #1e1018 50%, #f43f5e 50%); }

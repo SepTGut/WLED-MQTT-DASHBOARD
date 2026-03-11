@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>MQTT Controller</title>
+
+  <!-- Stylesheets (load order matters) -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/themes.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+
+  <!-- Paho MQTT WebSocket client -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════
+       HEADER
+  ════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="app-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+          <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+        </svg>
+      </div>
+      <span class="app-title">MQTT Controller</span>
+    </div>
+    <div class="header-right">
+      <!-- Connection status pill -->
+      <div id="conn-badge" class="conn-badge" data-state="disconnected">
+        <span class="conn-dot"></span>
+        <span class="conn-label">Offline</span>
+      </div>
+      <!-- Theme toggle -->
+      <button class="icon-btn" id="theme-btn" title="Change theme" aria-label="Change theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 2a10 10 0 0 1 0 20"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════
+       THEME PANEL (slide-up sheet)
+  ════════════════════════════════════ -->
+  <div id="theme-panel" class="theme-panel hidden" role="dialog" aria-modal="true" aria-label="Theme selector">
+    <div class="theme-panel-backdrop" id="theme-backdrop"></div>
+    <div class="theme-panel-inner">
+      <p class="theme-panel-title">Choose Theme</p>
+      <div class="theme-grid">
+        <button class="theme-swatch" data-theme="dark">
+          <span class="swatch-preview swatch-dark"></span>
+          <span>Dark</span>
+        </button>
+        <button class="theme-swatch" data-theme="light">
+          <span class="swatch-preview swatch-light"></span>
+          <span>Light</span>
+        </button>
+        <button class="theme-swatch" data-theme="purple">
+          <span class="swatch-preview swatch-purple"></span>
+          <span>Purple</span>
+        </button>
+        <button class="theme-swatch" data-theme="ocean">
+          <span class="swatch-preview swatch-ocean"></span>
+          <span>Ocean</span>
+        </button>
+        <button class="theme-swatch" data-theme="amber">
+          <span class="swatch-preview swatch-amber"></span>
+          <span>Amber</span>
+        </button>
+        <button class="theme-swatch" data-theme="rose">
+          <span class="swatch-preview swatch-rose"></span>
+          <span>Rose</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════
+       MAIN LAYOUT
+  ════════════════════════════════════ -->
+  <main class="app-main">
+
+    <!-- Sidebar nav (desktop) / scroll nav (tablet) -->
+    <nav class="tab-bar" role="tablist" aria-label="Page navigation">
+      <button class="tab-btn active" data-tab="relays" role="tab" aria-selected="true" aria-controls="tab-relays">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="7" width="20" height="10" rx="2"/>
+          <circle cx="7" cy="12" r="2" fill="currentColor" stroke="none"/>
+          <circle cx="17" cy="12" r="2"/>
+          <path d="M9 12h6"/>
+        </svg>
+        <span>Relays</span>
+      </button>
+      <button class="tab-btn" data-tab="wled" role="tab" aria-selected="false" aria-controls="tab-wled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <span>WLED</span>
+      </button>
+      <button class="tab-btn" data-tab="sensors" role="tab" aria-selected="false" aria-controls="tab-sensors">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22V12"/>
+          <circle cx="12" cy="7" r="5"/>
+          <path d="M9 7a3 3 0 0 1 6 0"/>
+        </svg>
+        <span>Sensors</span>
+      </button>
+      <button class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="tab-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <!-- Tab content area -->
+    <div class="tab-content">
+
+      <!-- ───────────────────────────────
+           RELAYS TAB
+      ─────────────────────────────── -->
+      <section id="tab-relays" class="tab-panel active" role="tabpanel">
+
+        <!-- Quick action bar -->
+        <div class="quick-bar">
+          <button class="quick-btn btn-danger" id="btn-alloff" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M18.36 6.64A9 9 0 1 1 5.64 19.36"/>
+              <path d="M12 2v10"/>
+            </svg>
+            All OFF
+          </button>
+          <button class="quick-btn btn-success" id="btn-allon" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 2v10"/>
+              <path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>
+            </svg>
+            All ON
+          </button>
+          <button class="quick-btn" id="btn-ping" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            Ping
+          </button>
+          <button class="quick-btn btn-accent" id="btn-show-pattern" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Pattern
+          </button>
+        </div>
+
+        <!-- Relay cards - populated by relays.js -->
+        <div id="relay-grid" class="relay-grid">
+          <div class="empty-state" id="relay-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="7" width="20" height="10" rx="2"/>
+              <circle cx="7" cy="12" r="2"/>
+              <circle cx="17" cy="12" r="2"/>
+              <path d="M9 12h6"/>
+            </svg>
+            <p>Connect to broker to see relays</p>
+          </div>
+        </div>
+
+        <!-- Pattern sequencer (hidden until Pattern button clicked) -->
+        <div class="section-card" id="pattern-section" style="display:none">
+          <div class="section-header">
+            <span class="section-title">Pattern Sequencer</span>
+            <button class="chip-btn chip-danger" id="btn-pattern-stop">■ Stop</button>
+          </div>
+          <!-- Steps are added dynamically by relays.js -->
+          <div id="pattern-steps" class="pattern-steps"></div>
+          <button class="secondary-btn" id="btn-add-step" style="margin-top:8px">+ Add Step</button>
+          <div class="pattern-footer">
+            <label class="field-label" style="flex:1">
+              Repeat
+              <select id="pattern-repeat" class="field-select">
+                <option value="0">Once</option>
+                <option value="-1" selected>Infinite</option>
+                <option value="3">3×</option>
+                <option value="5">5×</option>
+                <option value="10">10×</option>
+              </select>
+            </label>
+            <button class="primary-btn" id="btn-pattern-run" disabled>▶ Run</button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ───────────────────────────────
+           WLED TAB
+      ─────────────────────────────── -->
+      <section id="tab-wled" class="tab-panel" role="tabpanel">
+
+        <div class="empty-state" id="wled-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <p>Connect to broker to control WLED</p>
+        </div>
+
+        <div id="wled-panel" style="display:none">
+
+          <!-- Power toggle -->
+          <div class="section-card">
+            <div class="wled-power-row">
+              <span class="section-title">Power</span>
+              <label class="toggle-switch" aria-label="WLED power">
+                <input type="checkbox" id="wled-power" />
+                <span class="toggle-knob"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Brightness -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">Brightness</span>
+              <span id="bri-value" class="value-badge">128</span>
+            </div>
+            <input type="range" id="wled-bri" class="slider" min="0" max="255" value="128"
+                   aria-label="Brightness" />
+          </div>
+
+          <!-- Color -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">Color</span>
+              <span id="color-hex" class="value-badge mono">#FF6600</span>
+            </div>
+            <div class="color-row">
+              <input type="color" id="wled-color" class="color-picker" value="#FF6600"
+                     aria-label="Color picker" />
+              <div class="color-presets" id="color-presets" role="group" aria-label="Color presets">
+                <button class="color-dot" style="background:#FF0000" data-color="#FF0000" title="Red" aria-label="Red"></button>
+                <button class="color-dot" style="background:#FF6600" data-color="#FF6600" title="Orange" aria-label="Orange"></button>
+                <button class="color-dot" style="background:#FFFF00" data-color="#FFFF00" title="Yellow" aria-label="Yellow"></button>
+                <button class="color-dot" style="background:#00FF00" data-color="#00FF00" title="Green" aria-label="Green"></button>
+                <button class="color-dot" style="background:#00FFFF" data-color="#00FFFF" title="Cyan" aria-label="Cyan"></button>
+                <button class="color-dot" style="background:#0000FF" data-color="#0000FF" title="Blue" aria-label="Blue"></button>
+                <button class="color-dot" style="background:#FF00FF" data-color="#FF00FF" title="Magenta" aria-label="Magenta"></button>
+                <button class="color-dot" style="background:#FFFFFF" data-color="#FFFFFF" title="White" aria-label="White"></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Speed & Intensity -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">Speed</span>
+              <span id="spd-value" class="value-badge">128</span>
+            </div>
+            <input type="range" id="wled-spd" class="slider" min="0" max="255" value="128"
+                   aria-label="Effect speed" />
+            <div class="section-header" style="margin-top:16px">
+              <span class="section-title">Intensity</span>
+              <span id="int-value" class="value-badge">128</span>
+            </div>
+            <input type="range" id="wled-int" class="slider" min="0" max="255" value="128"
+                   aria-label="Effect intensity" />
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ───────────────────────────────
+           SENSORS TAB
+      ─────────────────────────────── -->
+      <section id="tab-sensors" class="tab-panel" role="tabpanel">
+        <div class="empty-state" id="sensors-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22V12"/>
+            <circle cx="12" cy="7" r="5"/>
+            <path d="M9 7a3 3 0 0 1 6 0"/>
+          </svg>
+          <p>No sensors reported yet</p>
+        </div>
+        <!-- Sensor cards - populated by app.js -->
+        <div id="sensor-grid" class="sensor-grid"></div>
+      </section>
+
+      <!-- ───────────────────────────────
+           SETTINGS TAB
+      ─────────────────────────────── -->
+      <section id="tab-settings" class="tab-panel" role="tabpanel">
+
+        <!-- Broker settings -->
+        <div class="section-card">
+          <p class="section-title">Broker</p>
+          <div class="field-group">
+            <label class="field-label">
+              Host
+              <input type="text" id="cfg-host" class="field-input"
+                     placeholder="broker.hivemq.com" value="broker.hivemq.com"
+                     autocomplete="off" spellcheck="false" />
+            </label>
+            <div class="field-row">
+              <label class="field-label" style="flex:1">
+                Port
+                <input type="number" id="cfg-port" class="field-input"
+                       placeholder="8884" value="8884" min="1" max="65535" />
+              </label>
+              <label class="field-label tls-toggle">
+                <input type="checkbox" id="cfg-tls" checked />
+                <span>WSS / TLS</span>
+              </label>
+            </div>
+            <label class="field-label">
+              Username <span class="muted">(optional)</span>
+              <input type="text" id="cfg-user" class="field-input"
+                     placeholder="leave blank if none" autocomplete="off" />
+            </label>
+            <label class="field-label">
+              Password <span class="muted">(optional)</span>
+              <input type="password" id="cfg-pass" class="field-input"
+                     placeholder="leave blank if none" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Topic settings -->
+        <div class="section-card">
+          <p class="section-title">Topics</p>
+          <div class="field-group">
+            <label class="field-label">
+              Relay Controller Prefix
+              <input type="text" id="cfg-relay-prefix" class="field-input"
+                     placeholder="home/relay" value="home/relay"
+                     autocomplete="off" spellcheck="false" />
+              <span class="field-hint">Default: <code>home/relay</code></span>
+            </label>
+            <label class="field-label">
+              WLED Device Topic
+              <input type="text" id="cfg-wled-prefix" class="field-input"
+                     placeholder="wled/my_wled" value="wled/my_wled"
+                     autocomplete="off" spellcheck="false" />
+              <span class="field-hint">Match your WLED MQTT device topic</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Connect / Disconnect -->
+        <div class="settings-actions">
+          <button class="primary-btn full-width" id="btn-connect">Connect</button>
+          <button class="danger-btn full-width" id="btn-disconnect" disabled>Disconnect</button>
+        </div>
+
+        <!-- Activity log -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-title">Activity Log</span>
+            <button class="chip-btn" id="btn-clear-log">Clear</button>
+          </div>
+          <div id="log-output" class="log-output" role="log" aria-live="polite"></div>
+        </div>
+
+      </section>
+
+    </div><!-- /tab-content -->
+  </main>
+
+  <!-- ════════════════════════════════════
+       BOTTOM NAV (mobile only, hidden on desktop via CSS)
+  ════════════════════════════════════ -->
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="bnav-btn active" data-tab="relays" aria-label="Relays">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="7" width="20" height="10" rx="2"/>
+        <circle cx="7" cy="12" r="2" fill="currentColor" stroke="none"/>
+        <circle cx="17" cy="12" r="2"/>
+      </svg>
+      <span>Relays</span>
+    </button>
+    <button class="bnav-btn" data-tab="wled" aria-label="WLED">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+      <span>WLED</span>
+    </button>
+    <button class="bnav-btn" data-tab="sensors" aria-label="Sensors">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 22V12"/>
+        <circle cx="12" cy="7" r="5"/>
+      </svg>
+      <span>Sensors</span>
+    </button>
+    <button class="bnav-btn" data-tab="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+  <!-- JavaScript (order matters) -->
+  <script src="js/mqtt.js"></script>
+  <script src="js/relays.js"></script>
+  <script src="js/wled.js"></script>
+  <script src="js/sensors.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
