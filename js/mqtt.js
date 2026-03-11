@@ -154,7 +154,6 @@ window.MQTTClient = (function () {
       timeout:   10,
       keepAliveInterval: 30,
       cleanSession: true,
-      reconnect: false,   // we handle reconnect manually
       onSuccess: _onConnect,
       onFailure: (err) => {
         _log(`Connection failed: ${err.errorMessage}`, 'error');
