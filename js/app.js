@@ -54,6 +54,7 @@ window.AppLog = (function () {
    2. TAB ROUTING
 ══════════════════════════════════════════════════════ */
 (function initTabs() {
+  var KEY      = 'mqttctrl_active_tab';
   var panels   = document.querySelectorAll('.tab-panel');
   var tabBtns  = document.querySelectorAll('.tab-btn');
   var bnavBtns = document.querySelectorAll('.bnav-btn');
@@ -66,10 +67,16 @@ window.AppLog = (function () {
       b.setAttribute('aria-selected', on);
     });
     bnavBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.tab === name); });
+    try { localStorage.setItem(KEY, name); } catch (e) { /* ignore */ }
   }
 
   tabBtns.forEach(function (b)  { b.addEventListener('click', function () { switchTab(b.dataset.tab); }); });
   bnavBtns.forEach(function (b) { b.addEventListener('click', function () { switchTab(b.dataset.tab); }); });
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) { /* ignore */ }
+  var valid = saved && document.getElementById('tab-' + saved);
+  if (valid) switchTab(saved);
 })();
 
 
@@ -109,17 +116,26 @@ window.AppLog = (function () {
 ══════════════════════════════════════════════════════ */
 (function initSettings() {
   var KEY    = 'mqttctrl_settings';
-  var fields = ['cfg-host','cfg-port','cfg-tls','cfg-user','cfg-relay-prefix','cfg-wled-prefix'];
+  var VERSION = 2;
+  var fields = ['cfg-host','cfg-port','cfg-tls','cfg-user','cfg-relay-prefix','cfg-wled-prefix','cfg-remember-pass'];
 
   /* Restore */
   try {
     var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+    if (!saved.__v || saved.__v < VERSION) {
+      saved = { __v: VERSION };
+      localStorage.setItem(KEY, JSON.stringify(saved));
+    }
     fields.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el || saved[id] === undefined) return;
       if (el.type === 'checkbox') el.checked = !!saved[id];
       else el.value = saved[id];
     });
+    var pass = document.getElementById('cfg-pass');
+    if (pass && saved['cfg-remember-pass'] && typeof saved['cfg-pass'] === 'string') {
+      pass.value = saved['cfg-pass'];
+    }
   } catch (e) { /* ignore */ }
 
   /* Save on every change */
@@ -129,11 +145,29 @@ window.AppLog = (function () {
     el.addEventListener('change', function () {
       try {
         var data = JSON.parse(localStorage.getItem(KEY) || '{}');
+        data.__v = VERSION;
         data[id] = el.type === 'checkbox' ? el.checked : el.value;
+        var passEl = document.getElementById('cfg-pass');
+        var rememberEl = document.getElementById('cfg-remember-pass');
+        if (passEl && rememberEl && rememberEl.checked) data['cfg-pass'] = passEl.value;
+        if (rememberEl && !rememberEl.checked) delete data['cfg-pass'];
         localStorage.setItem(KEY, JSON.stringify(data));
       } catch (e) { /* ignore */ }
     });
   });
+
+  var passEl = document.getElementById('cfg-pass');
+  if (passEl) {
+    passEl.addEventListener('change', function () {
+      try {
+        var data = JSON.parse(localStorage.getItem(KEY) || '{}');
+        data.__v = VERSION;
+        var rememberEl = document.getElementById('cfg-remember-pass');
+        if (rememberEl && rememberEl.checked) data['cfg-pass'] = passEl.value;
+        localStorage.setItem(KEY, JSON.stringify(data));
+      } catch (e) { /* ignore */ }
+    });
+  }
 })();
 
 
@@ -147,10 +181,14 @@ window.AppLog = (function () {
   var badgeLabel    = badge.querySelector('.conn-label');
 
   /* ── setConnectionState ────────────────────────── */
-  function setState(state) {
+  function setState(state, meta) {
     badge.setAttribute('data-state', state);
     var labels = { disconnected:'Offline', connecting:'Connecting…', connected:'Online', error:'Error' };
-    badgeLabel.textContent = labels[state] || state;
+    var text = labels[state] || state;
+    if (state === 'connecting' && meta && meta.retryAttempt) {
+      text = 'Connecting (try ' + meta.retryAttempt + ')';
+    }
+    badgeLabel.textContent = text;
 
     var connected = (state === 'connected');
     var busy      = (state === 'connecting');

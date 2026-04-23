@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MQTT Dashboard (React + Tailwind)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useMemo, useState } = React;
+
+    function cn(...parts) {
+      return parts.filter(Boolean).join(" ");
+    }
+
+    function App() {
+      const [tab, setTab] = useState("relays");
+      const [status, setStatus] = useState("offline");
+      const [host, setHost] = useState("broker.hivemq.com");
+      const [port, setPort] = useState("8884");
+      const [tls, setTls] = useState(true);
+      const [user, setUser] = useState("");
+      const [pass, setPass] = useState("");
+      const [prefix, setPrefix] = useState("home/relay");
+      const [log, setLog] = useState([]);
+      const [client, setClient] = useState(null);
+
+      const canControl = status === "online";
+
+      const badgeClass = useMemo(() => {
+        if (status === "online") return "bg-emerald-500/20 text-emerald-300 border-emerald-600/40";
+        if (status === "connecting") return "bg-amber-500/20 text-amber-200 border-amber-600/40";
+        if (status === "error") return "bg-rose-500/20 text-rose-200 border-rose-600/40";
+        return "bg-slate-500/20 text-slate-200 border-slate-600/40";
+      }, [status]);
+
+      function addLog(msg) {
+        const now = new Date().toLocaleTimeString();
+        setLog((prev) => [...prev.slice(-149), `[${now}] ${msg}`]);
+      }
+
+      function connect() {
+        if (!host.trim()) return addLog("Host is required.");
+        const p = Number(port);
+        if (!Number.isInteger(p) || p < 1 || p > 65535) return addLog("Invalid port.");
+
+        setStatus("connecting");
+        addLog(`Connecting to ${tls ? "wss" : "ws"}://${host}:${p} ...`);
+
+        const id = "reactdash_" + Math.random().toString(16).slice(2, 10);
+        const c = new Paho.MQTT.Client(host.trim(), p, "/mqtt", id);
+
+        c.onConnectionLost = (res) => {
+          setStatus(res.errorCode === 0 ? "offline" : "error");
+          addLog(`Disconnected: ${res.errorMessage || "unknown"}`);
+        };
+
+        c.onMessageArrived = (msg) => {
+          addLog(`RX ${msg.destinationName}: ${msg.payloadString}`);
+        };
+
+        c.connect({
+          useSSL: tls,
+          timeout: 10,
+          userName: user || undefined,
+          password: pass || undefined,
+          onSuccess: () => {
+            setClient(c);
+            setStatus("online");
+            addLog("Connected.");
+            c.subscribe(prefix + "/#", { qos: 0 });
+            addLog(`Subscribed: ${prefix}/#`);
+          },
+          onFailure: (err) => {
+            setStatus("error");
+            addLog("Connection failed: " + (err.errorMessage || "unknown"));
+          }
+        });
+      }
+
+      function disconnect() {
+        try {
+          if (client) client.disconnect();
+        } catch (_) {}
+        setClient(null);
+        setStatus("offline");
+        addLog("Disconnected.");
+      }
+
+      function publish(topic, payload) {
+        if (!client || status !== "online") return addLog("Not connected.");
+        const msg = new Paho.MQTT.Message(String(payload));
+        msg.destinationName = topic;
+        client.send(msg);
+        addLog(`TX ${topic}: ${payload}`);
+      }
+
+      function quickAllOn() { publish(prefix, "ON"); }
+      function quickAllOff() { publish(prefix, "OFF"); }
+      function quickPing() { publish(prefix + "/ping", "1"); }
+
+      return (
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <header className="flex items-center justify-between gap-3 mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight">MQTT Dashboard</h1>
+            <span className={cn("px-3 py-1 rounded-full text-sm border", badgeClass)}>
+              {status.toUpperCase()}
+            </span>
+          </header>
+
+          <div className="grid md:grid-cols-[220px,1fr] gap-4">
+            <aside className="bg-slate-900 border border-slate-800 rounded-xl p-2">
+              {["relays", "wled", "sensors", "settings"].map((name) => (
+                <button
+                  key={name}
+                  onClick={() => setTab(name)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-lg capitalize mb-1",
+                    tab === name ? "bg-cyan-500/20 text-cyan-200" : "hover:bg-slate-800 text-slate-300"
+                  )}
+                >
+                  {name}
+                </button>
+              ))}
+            </aside>
+
+            <main className="space-y-4">
+              {tab === "relays" && (
+                <section className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <h2 className="text-lg font-medium mb-3">Relays</h2>
+                  <div className="flex flex-wrap gap-2">
+                    <button disabled={!canControl} onClick={quickAllOn} className="px-3 py-2 rounded-lg bg-emerald-600 disabled:opacity-40">All ON</button>
+                    <button disabled={!canControl} onClick={quickAllOff} className="px-3 py-2 rounded-lg bg-rose-600 disabled:opacity-40">All OFF</button>
+                    <button disabled={!canControl} onClick={quickPing} className="px-3 py-2 rounded-lg bg-cyan-700 disabled:opacity-40">Ping</button>
+                  </div>
+                  <p className="text-slate-400 text-sm mt-3">Simple React starter. You can keep extending this tab.</p>
+                </section>
+              )}
+
+              {tab === "wled" && (
+                <section className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <h2 className="text-lg font-medium mb-2">WLED</h2>
+                  <p className="text-slate-400 text-sm">Placeholder for color, brightness, speed, intensity controls.</p>
+                </section>
+              )}
+
+              {tab === "sensors" && (
+                <section className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <h2 className="text-lg font-medium mb-2">Sensors</h2>
+                  <p className="text-slate-400 text-sm">Placeholder for live sensor cards from MQTT topics.</p>
+                </section>
+              )}
+
+              {tab === "settings" && (
+                <section className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <h2 className="text-lg font-medium mb-3">Connection Settings</h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="text-sm">Host
+                      <input value={host} onChange={(e) => setHost(e.target.value)} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" />
+                    </label>
+                    <label className="text-sm">Port
+                      <input value={port} onChange={(e) => setPort(e.target.value)} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" />
+                    </label>
+                    <label className="text-sm">Username
+                      <input value={user} onChange={(e) => setUser(e.target.value)} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" />
+                    </label>
+                    <label className="text-sm">Password
+                      <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" />
+                    </label>
+                    <label className="text-sm sm:col-span-2">Relay Prefix
+                      <input value={prefix} onChange={(e) => setPrefix(e.target.value)} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2" />
+                    </label>
+                  </div>
+                  <label className="inline-flex items-center gap-2 mt-3 text-sm">
+                    <input type="checkbox" checked={tls} onChange={(e) => setTls(e.target.checked)} />
+                    WSS / TLS
+                  </label>
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={connect} disabled={status === "connecting" || status === "online"} className="px-3 py-2 rounded-lg bg-cyan-600 disabled:opacity-40">Connect</button>
+                    <button onClick={disconnect} disabled={status !== "online"} className="px-3 py-2 rounded-lg bg-slate-700 disabled:opacity-40">Disconnect</button>
+                  </div>
+                </section>
+              )}
+
+              <section className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium">Activity Log</h3>
+                  <button onClick={() => setLog([])} className="text-sm text-slate-300 hover:text-white">Clear</button>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 h-56 overflow-auto text-xs font-mono space-y-1">
+                  {log.length === 0 ? <div className="text-slate-500">No log yet.</div> : log.map((line, i) => <div key={i}>{line}</div>)}
+                </div>
+              </section>
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

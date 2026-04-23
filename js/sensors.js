@@ -77,7 +77,10 @@ window.SensorModule = (function () {
     var id    = parseInt(parts[parts.length - 2], 10);
     if (isNaN(id)) return;
 
-    var active = (payloadStr.trim().toLowerCase() === 'active');
+    var active = window.AppCoreUtils && window.AppCoreUtils.sensorStateFromPayload
+      ? window.AppCoreUtils.sensorStateFromPayload(payloadStr)
+      : (payloadStr.trim().toLowerCase() === 'active');
+    if (active === null) return;
     var sensor = _sensors.find(function (s) { return s.id === id; });
 
     if (sensor) {

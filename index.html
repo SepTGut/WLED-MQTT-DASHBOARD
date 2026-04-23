@@ -330,6 +330,10 @@
               <input type="password" id="cfg-pass" class="field-input"
                      placeholder="leave blank if none" />
             </label>
+            <label class="field-label tls-toggle">
+              <input type="checkbox" id="cfg-remember-pass" />
+              <span>Remember Password (local only)</span>
+            </label>
           </div>
         </div>
 
@@ -410,6 +414,7 @@
   </nav>
 
   <!-- JavaScript (order matters) -->
+  <script src="js/core-utils.js"></script>
   <script src="js/mqtt.js"></script>
   <script src="js/relays.js"></script>
   <script src="js/wled.js"></script>

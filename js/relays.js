@@ -16,6 +16,7 @@ window.RelayModule = (function () {
   let _relays = [];       // [{id, name, on, timer}, …]
   let _timers = {};       // id → setInterval handle (countdown)
   let _patternSteps = []; // [{mask, duration_ms}, …]
+  let _pendingState = {}; // id -> expected bool
 
   /* ── logging shortcut ───────────────────────────── */
   const log = (m, lvl='info') => window.AppLog && AppLog[lvl](m);
@@ -49,6 +50,7 @@ window.RelayModule = (function () {
         timer: Number(r.timer) || 0
       };
     });
+    _pendingState = {};
     _render();
     log('[Relays] ' + _relays.length + ' relays updated', 'success');
   }
@@ -58,9 +60,16 @@ window.RelayModule = (function () {
     var parts = topic.split('/');
     var id    = parseInt(parts[parts.length - 2], 10);
     if (isNaN(id)) return;
-    var on    = (payloadStr.trim().toLowerCase() === 'on');
+    var on = window.AppCoreUtils && window.AppCoreUtils.relayStateFromPayload
+      ? window.AppCoreUtils.relayStateFromPayload(payloadStr)
+      : (payloadStr.trim().toLowerCase() === 'on');
+    if (on === null) return;
     var relay = _relays.find(function(r){ return r.id === id; });
-    if (relay) { relay.on = on; _updateCard(id); }
+    if (relay) {
+      relay.on = on;
+      if (_pendingState[id] !== undefined && _pendingState[id] === on) delete _pendingState[id];
+      _updateCard(id);
+    }
   }
 
   /* ════════════════════════════════════════════════
@@ -68,10 +77,12 @@ window.RelayModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _toggle(id) {
+    var r = _relays.find(function(x){ return x.id === id; });
+    if (!r) return;
+    _pendingState[id] = !r.on;
     MQTTClient.publishJSON(_prefix + '/api', { relay: id, on: 't' });
-    log('→ Toggle relay ' + id);
-    var r = _relays.find(function(r){ return r.id === id; });
-    if (r) { r.on = !r.on; _updateCard(id); }
+    log('→ Toggle relay ' + id + ' (pending confirmation)');
+    _updateCard(id);
   }
 
   function _pulse(id, ms) {
@@ -167,8 +178,12 @@ window.RelayModule = (function () {
     var relay = _relays.find(function(r){ return r.id === id; });
     if (!card || !relay) return;
     card.classList.toggle('on', relay.on);
+    card.classList.toggle('pending', _pendingState[id] !== undefined);
     var btn = card.querySelector('[data-action="toggle"]');
-    if (btn) btn.textContent = relay.on ? 'ON' : 'OFF';
+    if (btn) {
+      if (_pendingState[id] !== undefined) btn.textContent = '...';
+      else btn.textContent = relay.on ? 'ON' : 'OFF';
+    }
   }
 
   /* ════════════════════════════════════════════════
@@ -286,7 +301,11 @@ window.RelayModule = (function () {
      PATTERN SEQUENCER UI
   ════════════════════════════════════════════════ */
 
+  var _patternUiWired = false;
+
   function _initPatternUI() {
+    if (_patternUiWired) return;
+    _patternUiWired = true;
     var btnAdd  = document.getElementById('btn-add-step');
     var btnRun  = document.getElementById('btn-pattern-run');
     var btnStop = document.getElementById('btn-pattern-stop');
@@ -383,6 +402,7 @@ window.RelayModule = (function () {
     Object.keys(_timers).forEach(function(k){ clearInterval(_timers[k]); });
     _timers  = {};
     _relays  = [];
+    _pendingState = {};
     var empty = document.getElementById('relay-empty');
     var grid  = document.getElementById('relay-grid');
     if (empty) { empty.querySelector('p').textContent = 'Connect to broker to see relays'; empty.style.display = ''; }
@@ -428,6 +448,12 @@ window.RelayModule = (function () {
       padding: 10px;
       margin-top: 8px;
       animation: sheet-in .15s ease;
+    }
+    .relay-card.pending {
+      opacity: .75;
+    }
+    .relay-card.pending .relay-toggle {
+      border-style: dashed;
     }
     @keyframes sheet-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
 

@@ -19,12 +19,11 @@ window.MQTTClient = (function () {
   let _connected   = false;
   let _cfg         = null;
   let _reconnTimer = null;
+  let _retryAttempt = 0;
+  const _maxRetries = 12;
 
   // topic pattern → array of callback(payloadStr, topic)
   const _subs = {};
-
-  // How many pending subscribes are queued while disconnected
-  const _pendingSubs = new Set();
 
   /* ── helpers ────────────────────────────────────── */
   function _log(msg, level = 'info') {
@@ -38,13 +37,39 @@ window.MQTTClient = (function () {
 
   /* ── topic matching (supports # and + wildcards) ── */
   function _topicMatches(pattern, topic) {
-    if (pattern === topic) return true;
-    // Convert MQTT wildcards to regex
-    const re = '^' + pattern
-      .replace(/[.+?^${}()|[\]\\]/g, m => m === '+' ? '[^/]+' : '\\' + m)
-      .replace(/\/#$/, '(/.*)?')
-      .replace(/#$/, '.*') + '$';
-    return new RegExp(re).test(topic);
+    if (window.AppCoreUtils && window.AppCoreUtils.mqttTopicMatches) {
+      return window.AppCoreUtils.mqttTopicMatches(pattern, topic);
+    }
+    return pattern === topic;
+  }
+
+  function _nextReconnectMs() {
+    var base = 1000;
+    var cap = 30000;
+    var delay = window.AppCoreUtils && window.AppCoreUtils.computeBackoffMs
+      ? window.AppCoreUtils.computeBackoffMs(_retryAttempt, base, cap)
+      : Math.min(base * Math.pow(2, _retryAttempt), cap);
+    var jitter = Math.floor(delay * (Math.random() * 0.4 - 0.2));
+    return Math.max(500, delay + jitter);
+  }
+
+  function _scheduleReconnect(reason) {
+    if (!_cfg) return;
+    if (_retryAttempt >= _maxRetries) {
+      _log('Reconnect limit reached; please reconnect manually.', 'error');
+      window.setConnectionState && window.setConnectionState('error');
+      return;
+    }
+    if (_reconnTimer) clearTimeout(_reconnTimer);
+    var waitMs = _nextReconnectMs();
+    var n = _retryAttempt + 1;
+    _log((reason || 'Reconnecting') + ' in ' + (waitMs / 1000).toFixed(1) + ' s (attempt ' + n + ')', 'warning');
+    window.setConnectionState && window.setConnectionState('connecting', { retryAttempt: n, retryInMs: waitMs });
+    _reconnTimer = setTimeout(function () {
+      _reconnTimer = null;
+      _retryAttempt += 1;
+      _doConnect(_cfg);
+    }, waitMs);
   }
 
   /* ── dispatch incoming message to subscribers ───── */
@@ -74,6 +99,7 @@ window.MQTTClient = (function () {
   /* ── Paho callbacks ─────────────────────────────── */
   function _onConnect() {
     _connected = true;
+    _retryAttempt = 0;
     _log('Connected to broker ✓', 'success');
     window.setConnectionState && window.setConnectionState('connected');
 
@@ -97,6 +123,7 @@ window.MQTTClient = (function () {
     // Notify modules
     window.RelayModule && window.RelayModule.onConnected && window.RelayModule.onConnected();
     window.WLEDModule  && window.WLEDModule.onConnected  && window.WLEDModule.onConnected();
+    window.SensorModule && window.SensorModule.onConnected && window.SensorModule.onConnected();
   }
 
   function _onConnectionLost(res) {
@@ -110,12 +137,11 @@ window.MQTTClient = (function () {
     // Notify modules
     window.RelayModule && window.RelayModule.onDisconnected && window.RelayModule.onDisconnected();
     window.WLEDModule  && window.WLEDModule.onDisconnected  && window.WLEDModule.onDisconnected();
+    window.SensorModule && window.SensorModule.onDisconnected && window.SensorModule.onDisconnected();
 
     // Auto-reconnect (unless user manually disconnected: errorCode 0)
     if (res.errorCode !== 0 && _cfg) {
-      _log('Reconnecting in 5 s…', 'warning');
-      window.setConnectionState && window.setConnectionState('connecting');
-      _reconnTimer = setTimeout(() => _doConnect(_cfg), 5000);
+      _scheduleReconnect('Reconnecting');
     }
   }
 
@@ -158,10 +184,7 @@ window.MQTTClient = (function () {
       onFailure: (err) => {
         _log(`Connection failed: ${err.errorMessage}`, 'error');
         window.setConnectionState && window.setConnectionState('error');
-        // Schedule reconnect
-        _log('Retrying in 5 s…', 'warning');
-        window.setConnectionState && window.setConnectionState('connecting');
-        _reconnTimer = setTimeout(() => _doConnect(cfg), 5000);
+        _scheduleReconnect('Retrying');
       }
     };
 
@@ -221,6 +244,7 @@ window.MQTTClient = (function () {
        cfg: { host, port, useTLS, username, password }  */
     connect(cfg) {
       _cfg = { ...cfg };
+      _retryAttempt = 0;
       _doConnect(_cfg);
     },
 
@@ -228,6 +252,7 @@ window.MQTTClient = (function () {
     disconnect() {
       if (_reconnTimer) { clearTimeout(_reconnTimer); _reconnTimer = null; }
       _cfg = null;   // prevent auto-reconnect
+      _retryAttempt = 0;
 
       if (_client && _connected) {
         // Send offline presence before disconnecting
