@@ -7,8 +7,7 @@
      {prefix}/g          brightness  0–255
      {prefix}/c          color hex   #RRGGBB
      {prefix}/status     "online" / "offline"
-     {prefix}/v          FULL JSON STATE (standard WLED)
-                         — ignored when not parseable
+     {prefix}/v          XML state (custom device) or JSON (standard WLED)
      {prefix}/mcutemp    MCU temperature (float)
 
    PUBLISH (commands to device):
@@ -49,7 +48,7 @@ window.WLEDModule = (function () {
     MQTTClient.subscribe(_prefix + '/c',       _onColor);
     MQTTClient.subscribe(_prefix + '/status',  _onStatus);
     MQTTClient.subscribe(_prefix + '/v',       _onFullState);
-    MQTTClient.subscribe(_prefix + '/mcutemp', _onMcutemp);   // ← MCU temperature
+    MQTTClient.subscribe(_prefix + '/mcutemp', _onMcutemp);
     log('[WLED] subscribed → ' + _prefix);
   }
 
@@ -87,33 +86,75 @@ window.WLEDModule = (function () {
     if (el) el.textContent = '--°C';
   }
 
-  /* ── {prefix}/v  full JSON state ────────────────── */
+  /* ── {prefix}/v  full state (JSON or XML) ───────── */
   function _onFullState(payloadStr) {
+    // Try JSON first (standard WLED)
     var json;
-    try { json = JSON.parse(payloadStr); } catch(e) { return; }
+    try { json = JSON.parse(payloadStr); } catch(e) { json = null; }
+    if (json) {
+      if (json.on   !== undefined) { _power = !!json.on;          _updatePowerUI(); }
+      if (json.bri  !== undefined) { _bri   = Number(json.bri);    _updateBriUI(); }
 
-    if (json.on   !== undefined) { _power = !!json.on;          _updatePowerUI(); }
-    if (json.bri  !== undefined) { _bri   = Number(json.bri);    _updateBriUI(); }
+      if (Array.isArray(json.col) && Array.isArray(json.col[0])) {
+        var rgb = json.col[0];
+        _color = _rgbToHex(rgb[0]||0, rgb[1]||0, rgb[2]||0);
+        _updateColorUI();
+      } else if (typeof json.col === 'string') {
+        _color = json.col.startsWith('#') ? json.col : '#' + json.col;
+        _updateColorUI();
+      }
 
-    if (Array.isArray(json.col) && Array.isArray(json.col[0])) {
-      var rgb = json.col[0];
-      _color = _rgbToHex(rgb[0]||0, rgb[1]||0, rgb[2]||0);
-      _updateColorUI();
-    } else if (typeof json.col === 'string') {
-      _color = json.col.startsWith('#') ? json.col : '#' + json.col;
-      _updateColorUI();
+      if (Array.isArray(json.seg) && json.seg[0]) {
+        var seg = json.seg[0];
+        if (seg.sx !== undefined) { _speed  = Number(seg.sx); _updateSpdUI(); }
+        if (seg.ix !== undefined) { _intens = Number(seg.ix); _updateIntUI(); }
+        if (seg.fx !== undefined) { _fx     = Number(seg.fx); _updateFxUI(); }
+      }
+
+      if (json.temp !== undefined && !isNaN(Number(json.temp))) {
+        _updateTempUI(Number(json.temp));
+      }
+      return;
     }
 
-    if (Array.isArray(json.seg) && json.seg[0]) {
-      var seg = json.seg[0];
-      if (seg.sx !== undefined) { _speed  = Number(seg.sx); _updateSpdUI(); }
-      if (seg.ix !== undefined) { _intens = Number(seg.ix); _updateIntUI(); }
-      if (seg.fx !== undefined) { _fx     = Number(seg.fx); _updateFxUI(); }
-    }
+    // XML path (custom KamarATS/SetGT device)
+    if (payloadStr.indexOf('<vs>') !== -1) {
+      var tag = function(name) {
+        var re = new RegExp('<' + name + '>([^<]*)</' + name + '>', 'i');
+        var m  = payloadStr.match(re);
+        return m ? m[1] : null;
+      };
 
-    // Also update temperature if present in JSON (some devices include it)
-    if (json.temp !== undefined && !isNaN(Number(json.temp))) {
-      _updateTempUI(Number(json.temp));
+      // Brightness
+      var ac = parseInt(tag('ac'), 10);
+      if (!isNaN(ac)) { _bri = Math.max(0, Math.min(255, ac)); _updateBriUI(); }
+
+      // Color (multiple <cl> elements)
+      var clValues = [];
+      var clRe = /<cl>([^<]*)<\/cl>/gi;
+      var clMatch;
+      while ((clMatch = clRe.exec(payloadStr)) !== null) {
+        clValues.push(parseInt(clMatch[1], 10));
+      }
+      if (clValues.length >= 3) {
+        var r = clValues[0] || 0, g = clValues[1] || 0, b = clValues[2] || 0;
+        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+          _color = _rgbToHex(r, g, b);
+          _updateColorUI();
+        }
+      }
+
+      // Speed
+      var sx = parseInt(tag('sx'), 10);
+      if (!isNaN(sx)) { _speed = Math.max(0, Math.min(255, sx)); _updateSpdUI(); }
+
+      // Intensity
+      var ix = parseInt(tag('ix'), 10);
+      if (!isNaN(ix)) { _intens = Math.max(0, Math.min(255, ix)); _updateIntUI(); }
+
+      // Effect
+      var fx = parseInt(tag('fx'), 10);
+      if (!isNaN(fx) && fx >= 0) { _fx = fx; _updateFxUI(); }
     }
   }
 
