@@ -182,15 +182,21 @@
           <p>Connect to broker to control WLED</p>
         </div>
         <div id="wled-panel" style="display:none">
+          <!-- Power + Refresh + Temperature -->
           <div class="section-card">
             <div class="wled-power-row">
               <span class="section-title">Power</span>
-              <label class="toggle-switch" aria-label="WLED power">
-                <input type="checkbox" id="wled-power" />
-                <span class="toggle-knob"></span>
-              </label>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button class="chip-btn" id="btn-wled-refresh" title="Refresh WLED state">↻</button>
+                <label class="toggle-switch" aria-label="WLED power">
+                  <input type="checkbox" id="wled-power" />
+                  <span class="toggle-knob"></span>
+                </label>
+                <span id="wled-temp" class="value-badge" style="margin-left:auto; min-width:48px;">--°C</span>
+              </div>
             </div>
           </div>
+          <!-- Brightness -->
           <div class="section-card">
             <div class="section-header">
               <span class="section-title">Brightness</span>
@@ -198,6 +204,7 @@
             </div>
             <input type="range" id="wled-bri" class="slider" min="0" max="255" value="128" />
           </div>
+          <!-- Color -->
           <div class="section-card">
             <div class="section-header">
               <span class="section-title">Color</span>
@@ -217,11 +224,86 @@
               </div>
             </div>
           </div>
+          <!-- Speed & Intensity -->
           <div class="section-card">
             <div class="section-header"><span class="section-title">Speed</span><span id="spd-value" class="value-badge">128</span></div>
             <input type="range" id="wled-spd" class="slider" min="0" max="255" value="128" />
             <div class="section-header" style="margin-top:16px"><span class="section-title">Intensity</span><span id="int-value" class="value-badge">128</span></div>
             <input type="range" id="wled-int" class="slider" min="0" max="255" value="128" />
+          </div>
+          <!-- Effects & Presets -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">Effects & Presets</span>
+            </div>
+            <div class="field-group">
+              <label class="field-label">
+                Effect
+                <select id="wled-fx" class="field-select">
+                  <option value="-1">(none)</option>
+                  <option value="0">Solid</option>
+                  <option value="1">Blink</option>
+                  <option value="2">Breathe</option>
+                  <option value="3">Wipe</option>
+                  <option value="4">Wipe Random</option>
+                  <option value="5">Random Colors</option>
+                  <option value="6">Sweep</option>
+                  <option value="7">Dynamic</option>
+                  <option value="8">Colorloop</option>
+                  <option value="9">Rainbow</option>
+                  <option value="10">Scan</option>
+                  <option value="11">Dual Scan</option>
+                  <option value="12">Fade</option>
+                  <option value="13">Theater</option>
+                  <option value="14">Theater Rainbow</option>
+                  <option value="15">Running</option>
+                  <option value="16">Saw</option>
+                  <option value="17">Twinkle</option>
+                  <option value="18">Dissolve</option>
+                  <option value="19">Dissolve Rnd</option>
+                  <option value="20">Sparkle</option>
+                  <option value="21">Dark Sparkle</option>
+                  <option value="22">Sparkle+</option>
+                  <option value="23">Strobe</option>
+                  <option value="24">Strobe Rainbow</option>
+                  <option value="25">Mega Strobe</option>
+                  <option value="26">Blink Rainbow</option>
+                  <option value="27">Android</option>
+                  <option value="28">Chase</option>
+                  <option value="29">Chase Random</option>
+                  <option value="30">Chase Rainbow</option>
+                  <option value="31">Chase Flash</option>
+                  <option value="32">Chase Flash Rnd</option>
+                  <option value="33">Rainbow Runner</option>
+                  <option value="34">Colorful</option>
+                  <option value="35">Traffic Light</option>
+                  <option value="36">Sweep Random</option>
+                  <option value="37">Running 2</option>
+                  <option value="38">Aurora</option>
+                  <option value="39">Stream</option>
+                  <option value="40">Scanner</option>
+                  <option value="41">Lighthouse</option>
+                  <option value="42">Fireworks</option>
+                  <option value="43">Rain</option>
+                  <option value="44">Tetrix</option>
+                  <option value="45">Fire Flicker</option>
+                  <option value="46">Gradient</option>
+                  <option value="47">Loading</option>
+                  <option value="48">Rolling Balls</option>
+                  <option value="49">Fairy</option>
+                  <option value="50">Two Dots</option>
+                  <option value="51">Fairytwirl</option>
+                  <option value="52">Running Dual</option>
+                </select>
+              </label>
+              <div class="row" style="align-items:flex-end">
+                <label class="field-label" style="flex:1">
+                  Preset #
+                  <input type="number" id="wled-preset" class="field-input" value="1" min="1" max="250" step="1" />
+                </label>
+                <button class="primary-btn" id="btn-wled-loadpreset">Load Preset</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
