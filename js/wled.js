@@ -10,7 +10,6 @@
      {prefix}/v          FULL JSON STATE (standard WLED)
                          — ignored when not parseable
      {prefix}/mcutemp    MCU temperature (float)
-     {prefix}/system     system info JSON
 
    PUBLISH (commands to device):
      {prefix}            "ON" / "OFF"   (if supported)
@@ -50,8 +49,7 @@ window.WLEDModule = (function () {
     MQTTClient.subscribe(_prefix + '/c',       _onColor);
     MQTTClient.subscribe(_prefix + '/status',  _onStatus);
     MQTTClient.subscribe(_prefix + '/v',       _onFullState);
-    MQTTClient.subscribe(_prefix + '/mcutemp', _onMcutemp);
-    MQTTClient.subscribe(_prefix + '/system',  _onSystemInfo);   // ← System info
+    MQTTClient.subscribe(_prefix + '/mcutemp', _onMcutemp);   // ← MCU temperature
     log('[WLED] subscribed → ' + _prefix);
   }
 
@@ -59,7 +57,7 @@ window.WLEDModule = (function () {
   function _onStatus(payloadStr) {
     var p = payloadStr.trim().toLowerCase();
     if (p === 'online')  { _power = true;  _online = true;  _updatePowerUI(); _enableControls(true); }
-    if (p === 'offline') { _power = false; _online = false; _updatePowerUI(); _enableControls(false); _clearTemp(); _clearSysInfo(); }
+    if (p === 'offline') { _power = false; _online = false; _updatePowerUI(); _enableControls(false); _clearTemp(); }
   }
 
   /* ── Enable/disable all sliders and toggle ──────── */
@@ -80,19 +78,13 @@ window.WLEDModule = (function () {
     if (fxSel)    fxSel.disabled    = !on;
     if (presetInput) presetInput.disabled = !on;
     if (presetBtn)   presetBtn.disabled   = !on;
-    if (!on) { _clearTemp(); _clearSysInfo(); }
+    if (!on) _clearTemp();
   }
 
   /* ── Clear temperature badge ────────────────────── */
   function _clearTemp() {
     var el = document.getElementById('wled-temp');
     if (el) el.textContent = '--°C';
-  }
-
-  /* ── Clear system info ────────────────────────── */
-  function _clearSysInfo() {
-    var el = document.getElementById('wled-sysinfo');
-    if (el) el.innerHTML = 'Waiting for data…';
   }
 
   /* ── {prefix}/v  full JSON state ────────────────── */
@@ -119,6 +111,7 @@ window.WLEDModule = (function () {
       if (seg.fx !== undefined) { _fx     = Number(seg.fx); _updateFxUI(); }
     }
 
+    // Also update temperature if present in JSON (some devices include it)
     if (json.temp !== undefined && !isNaN(Number(json.temp))) {
       _updateTempUI(Number(json.temp));
     }
@@ -134,38 +127,6 @@ window.WLEDModule = (function () {
   function _updateTempUI(val) {
     var el = document.getElementById('wled-temp');
     if (el) el.textContent = val.toFixed(1) + '°C';
-  }
-
-  /* ── System Info ────────────────────────────────── */
-  function _onSystemInfo(payloadStr) {
-    var json;
-    try { json = JSON.parse(payloadStr); } catch(e) { return; }
-    var el = document.getElementById('wled-sysinfo');
-    if (!el) return;
-
-    var uptime = json.uptime_s;
-    var heap   = json.free_heap;
-    var rssi   = json.rssi;
-    var relaysOn  = json.relays_on;
-    var numRelays = json.num_relays;
-    var patActive = json.pattern_active;
-
-    var html = '';
-    if (uptime !== undefined) {
-      var d = Math.floor(uptime / 86400);
-      var h = Math.floor((uptime % 86400) / 3600);
-      var m = Math.floor((uptime % 3600) / 60);
-      var u = (d ? d + 'd ' : '') + h + 'h ' + m + 'm';
-      html += '<div><span>Uptime</span><span>' + u + '</span></div>';
-    }
-    if (heap !== undefined) html += '<div><span>Free Heap</span><span>' + (heap/1024).toFixed(1) + ' KB</span></div>';
-    if (rssi !== undefined) html += '<div><span>RSSI</span><span>' + rssi + ' dBm</span></div>';
-    if (numRelays !== undefined) {
-      html += '<div><span>Relays</span><span>' + (relaysOn||0) + ' / ' + numRelays + ' on</span></div>';
-    }
-    if (patActive !== undefined) html += '<div><span>Pattern</span><span>' + (patActive ? 'running' : 'idle') + '</span></div>';
-
-    el.innerHTML = html || 'Waiting for data…';
   }
 
   /* ── brightness ─────────────────────────────────── */
