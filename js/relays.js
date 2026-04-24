@@ -99,41 +99,46 @@ window.RelayModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _toggle(id) {
-  var r = _relays.find(function(x){ return x.id === id; });
-  if (!r) return;
-  _pendingState[id] = !r.on;
-  MQTTClient.publishJSON(_prefix + '/api', { relay: id, on: 't' });
-  log('→ Toggle relay ' + id + ' (pending confirmation)');
-  _updateCard(id);
+    var r = _relays.find(function(x){ return x.id === id; });
+    if (!r) return;
+    if (_pendingState[id] !== undefined) return;   // block rapid second click
+    _pendingState[id] = !r.on;
+    MQTTClient.publishJSON(_prefix + '/api', { relay: id, on: 't' });
+    log('→ Toggle relay ' + id + ' (pending confirmation)');
 
-  // Flash timeout: if confirmation doesn't arrive in 3s, revert and flash error
-  var timeout = setTimeout(function() {
-    if (_pendingState[id] !== undefined) {
-      delete _pendingState[id];
-      _updateCard(id);
-      var card = document.querySelector('.relay-card[data-id="' + id + '"]');
-      if (card) {
-        card.classList.add('flash-error');
-        setTimeout(function() { card.classList.remove('flash-error'); }, 600);
-      }
-      log('⚠ Relay ' + id + ' toggle timeout – no response', 'warning');
-    }
-  }, 3000);
+    // Disable All ON/OFF buttons briefly to prevent accidental mis‑clicks
+    if (window.tempDisableAllButtons) window.tempDisableAllButtons();
 
-  // The confirmation will arrive via _onRelayState, which clears pendingState.
-  // Once pending state is cleared, we flash the card.
-  var checkConfirm = setInterval(function() {
-    if (_pendingState[id] === undefined) {
-      clearInterval(checkConfirm);
-      clearTimeout(timeout);
-      var card = document.querySelector('.relay-card[data-id="' + id + '"]');
-      if (card) {
-        card.classList.add('flash-success');
-        setTimeout(function() { card.classList.remove('flash-success'); }, 600);
+    _updateCard(id);
+
+    // Flash timeout: if confirmation doesn't arrive in 3s, revert and flash error
+    var timeout = setTimeout(function() {
+      if (_pendingState[id] !== undefined) {
+        delete _pendingState[id];
+        _updateCard(id);
+        var card = document.querySelector('.relay-card[data-id="' + id + '"]');
+        if (card) {
+          card.classList.add('flash-error');
+          setTimeout(function() { card.classList.remove('flash-error'); }, 600);
+        }
+        log('⚠ Relay ' + id + ' toggle timeout – no response', 'warning');
       }
-    }
-  }, 100);
-}
+    }, 3000);
+
+    // The confirmation will arrive via _onRelayState, which clears pendingState.
+    // Once pending state is cleared, we flash the card.
+    var checkConfirm = setInterval(function() {
+      if (_pendingState[id] === undefined) {
+        clearInterval(checkConfirm);
+        clearTimeout(timeout);
+        var card = document.querySelector('.relay-card[data-id="' + id + '"]');
+        if (card) {
+          card.classList.add('flash-success');
+          setTimeout(function() { card.classList.remove('flash-success'); }, 600);
+        }
+      }
+    }, 100);
+  }
 
   function _pulse(id, ms) {
     ms = Math.max(50, parseInt(ms, 10) || 500);
@@ -204,11 +209,17 @@ window.RelayModule = (function () {
       '</div>';
 
     card.addEventListener('click', function(e) {
+      e.stopPropagation();          // prevent click from bubbling to parent elements
+
       var btn = e.target.closest('[data-action]');
       if (!btn) return;
       var action = btn.dataset.action;
       var id     = parseInt(card.dataset.id, 10);
-      if      (action === 'toggle') { _toggle(id); }
+
+      // Prevent double‑click / rapid toggle while a command is pending
+      if (action === 'toggle' && _pendingState[id] !== undefined) return;
+
+      if (action === 'toggle') { _toggle(id); }
       else if (action === 'pulse')  { _showPulseSheet(id, btn, card); }
       else if (action === 'timer')  { _showTimerSheet(id, btn, card); }
     });
