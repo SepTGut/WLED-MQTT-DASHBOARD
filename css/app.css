@@ -1,0 +1,142 @@
+/* ═══════════════════════════════════════════════════════
+   app.css — tiny overrides & special elements
+   (all layout/spacing is Tailwind)
+   ═══════════════════════════════════════════════════════ */
+
+/* Toggle switch knob (pseudo-element) */
+.toggle-knob::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--toggle-knob);
+  box-shadow: var(--shadow-sm);
+  transition: transform 200ms ease;
+}
+
+input:checked + .toggle-knob::before {
+  transform: translateX(20px);
+}
+
+/* Sliders (webkit + moz) */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  height: 6px;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--slider-thumb);
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
+  cursor: pointer;
+  transition: box-shadow 200ms ease;
+}
+.slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 6px var(--color-accent-dim);
+}
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--slider-thumb);
+  border: none;
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
+  cursor: pointer;
+}
+
+/* Color picker reset */
+.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.color-picker::-webkit-color-swatch { border: none; border-radius: 6px; }
+.color-picker::-moz-color-swatch { border: none; border-radius: 6px; }
+
+/* Theme panel animations (backdrop + slide) */
+.theme-panel:not(.hidden) .theme-panel-backdrop,
+.theme-panel:not(.hidden) .theme-panel-inner {
+  transition: opacity 350ms ease, transform 350ms ease;
+}
+.theme-panel:not(.hidden) {
+  pointer-events: all;
+}
+.theme-panel:not(.hidden) .theme-panel-backdrop {
+  opacity: 1;
+}
+.theme-panel:not(.hidden) .theme-panel-inner {
+  transform: translateY(0);
+}
+
+/* Swatch preview background gradients (from themes.css) */
+.swatch-dark   { background: linear-gradient(135deg, #1a1d27 50%, #6c8aff 50%); }
+.swatch-light  { background: linear-gradient(135deg, #f5f6fa 50%, #4a6bff 50%); }
+.swatch-purple { background: linear-gradient(135deg, #160f2e 50%, #a855f7 50%); }
+.swatch-ocean  { background: linear-gradient(135deg, #0c1a2e 50%, #06b6d4 50%); }
+.swatch-amber  { background: linear-gradient(135deg, #1e1408 50%, #f59e0b 50%); }
+.swatch-rose   { background: linear-gradient(135deg, #1e1018 50%, #f43f5e 50%); }
+
+/* Connection badge dot animation */
+.conn-badge[data-state="connected"] .conn-dot,
+.conn-badge[data-state="connecting"] .conn-dot {
+  animation: pulse-dot 2s infinite;
+}
+.conn-badge[data-state="connecting"] .conn-dot {
+  animation-duration: 1s;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .4; }
+}
+
+/* Active swatch highlight */
+.theme-swatch.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+/* Active color dot */
+.color-dot.active {
+  border-color: var(--color-text);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+/* Hide all tab panels by default */
+.tab-panel {
+  display: none;
+}
+
+/* Show the active one */
+.tab-panel.active {
+  display: block;
+}
+
+/* Sidebar tab active state */
+.tab-btn.active {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Bottom nav active state */
+.bnav-btn.active {
+  color: var(--bnav-active);   /* already defined per theme */
+}
+
+
+.tab-btn.active {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.tab-btn:not(.active) {
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}

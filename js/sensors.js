@@ -19,6 +19,9 @@ window.SensorModule = (function () {
   var _prefix  = 'home/relay';
   var _sensors = [];   /* [{id, name, gpio, active, lastChange}, …] */
 
+  var _subFull   = null;
+  var _subSensor = null;
+
   var log = function (m, lvl) { window.AppLog && AppLog[lvl || 'info'](m); };
 
   /* ════════════════════════════════════════════════
@@ -26,17 +29,14 @@ window.SensorModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _subscribe() {
-    /* Full state — shares the same /v topic as RelayModule.
-       We just look for the sensors[] array inside it.     */
-    MQTTClient.subscribe(_prefix + '/v',           _onFullState);
-    /* Per-sensor retained state */
-    MQTTClient.subscribe(_prefix + '/sensor/+/v',  _onSensorState);
+    _subFull   = MQTTClient.subscribe(_prefix + '/v',           _onFullState);
+    _subSensor = MQTTClient.subscribe(_prefix + '/sensor/+/v',  _onSensorState);
     log('[Sensors] subscribed → ' + _prefix);
   }
 
   function _unsubscribe() {
-    MQTTClient.unsubscribe(_prefix + '/v');
-    MQTTClient.unsubscribe(_prefix + '/sensor/+/v');
+    if (_subFull)   { _subFull.unsubscribe();   _subFull = null; }
+    if (_subSensor) { _subSensor.unsubscribe(); _subSensor = null; }
   }
 
   /* ── {prefix}/v  (we only care about sensors[]) ── */
@@ -45,7 +45,6 @@ window.SensorModule = (function () {
     try { json = JSON.parse(payloadStr); } catch (e) { return; }
     if (!Array.isArray(json.sensors) || json.sensors.length === 0) return;
 
-    /* Merge: keep lastChange timestamps already tracked */
     json.sensors.forEach(function (s) {
       var id  = s.id !== undefined ? s.id : s.index;
       var existing = _sensors.find(function (x) { return x.id === id; });
@@ -73,7 +72,6 @@ window.SensorModule = (function () {
   /* ── {prefix}/sensor/N/v ──────────────────────── */
   function _onSensorState(payloadStr, topic) {
     var parts = topic.split('/');
-    /* topic: home/relay/sensor/0/v  →  parts[-2] = "0" */
     var id    = parseInt(parts[parts.length - 2], 10);
     if (isNaN(id)) return;
 
@@ -90,7 +88,6 @@ window.SensorModule = (function () {
         _updateCard(id);
       }
     } else {
-      /* First time we hear about this sensor — add a stub */
       _sensors.push({
         id: id, name: 'Sensor ' + id, gpio: '–',
         active: active, lastChange: Date.now()
@@ -116,15 +113,12 @@ window.SensorModule = (function () {
 
     if (empty) empty.style.display = 'none';
 
-    /* Full rebuild — sensors don't change often */
     grid.innerHTML = '';
     _sensors.forEach(function (s) { grid.appendChild(_buildCard(s)); });
 
-    /* Start elapsed-time ticker */
     _startElapsedTicker();
   }
 
-  /* ── build one sensor card ──────────────────────── */
   function _buildCard(s) {
     var card = document.createElement('div');
     card.className = 'sensor-card' + (s.active ? ' active' : '');
@@ -149,7 +143,6 @@ window.SensorModule = (function () {
     return card;
   }
 
-  /* ── update an existing card in-place ───────────── */
   function _updateCard(id) {
     var grid   = document.getElementById('sensor-grid');
     var card   = grid && grid.querySelector('.sensor-card[data-id="' + id + '"]');
@@ -176,7 +169,7 @@ window.SensorModule = (function () {
         var el = document.getElementById('sensor-elapsed-' + s.id);
         if (el) el.textContent = _elapsed(s.lastChange);
       });
-    }, 5000);   /* update every 5 s */
+    }, 5000);
   }
 
   function _elapsed(ts) {
@@ -205,9 +198,6 @@ window.SensorModule = (function () {
     if (empty) { empty.style.display = ''; empty.querySelector('p').textContent = 'No sensors reported yet'; }
   }
 
-  /* ════════════════════════════════════════════════
-     HELPERS
-  ════════════════════════════════════════════════ */
   function _esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
@@ -222,7 +212,7 @@ window.SensorModule = (function () {
       _subscribe();
       log('[Sensors] init → ' + prefix);
     },
-    onConnected:    function () { /* prefix set via app.js wrapper */ },
+    onConnected:    function () {},
     onDisconnected: _onDisconnected,
     get sensors()   { return _sensors; }
   };
@@ -230,12 +220,11 @@ window.SensorModule = (function () {
 })();
 
 /* ════════════════════════════════════════════════════
-   Inject sensor-specific CSS
+   Inject sensor-specific CSS (unchanged)
 ════════════════════════════════════════════════════ */
 (function () {
   var s = document.createElement('style');
   s.textContent = `
-    /* ── sensor card ── */
     .sensor-card-top {
       display: flex;
       justify-content: space-between;

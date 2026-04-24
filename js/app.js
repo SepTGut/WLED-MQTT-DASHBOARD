@@ -241,6 +241,8 @@ window.AppLog = (function () {
 })();
 
 
+/* ... (all previous code exactly as in your file) ... */
+
 /* ══════════════════════════════════════════════════════
    6. QUICK-BAR ACTIONS  (relay tab)
 ══════════════════════════════════════════════════════ */
@@ -251,12 +253,12 @@ window.AppLog = (function () {
 
   document.getElementById('btn-alloff').addEventListener('click', function () {
     AppLog.info('→ All relays OFF');
-    MQTTClient.publish(relayPrefix(), 'OFF');
+    MQTTClient.publishJSON(relayPrefix() + '/api', { on: false });
   });
 
   document.getElementById('btn-allon').addEventListener('click', function () {
     AppLog.info('→ All relays ON');
-    MQTTClient.publish(relayPrefix(), 'ON');
+    MQTTClient.publishJSON(relayPrefix() + '/api', { on: true });
   });
 
   document.getElementById('btn-ping').addEventListener('click', function () {
@@ -270,6 +272,7 @@ window.AppLog = (function () {
   });
 })();
 
+/* ... (rest of app.js unchanged) ... */
 
 /* ══════════════════════════════════════════════════════
    7. MODULE WIRING  —  inject prefixes on connect

@@ -18,6 +18,10 @@ window.RelayModule = (function () {
   let _patternSteps = []; // [{mask, duration_ms}, …]
   let _pendingState = {}; // id -> expected bool
 
+  /* ── subscription handles ───────────────────────── */
+  let _subFull   = null;
+  let _subSingle = null;
+
   /* ── logging shortcut ───────────────────────────── */
   const log = (m, lvl='info') => window.AppLog && AppLog[lvl](m);
 
@@ -26,14 +30,14 @@ window.RelayModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _subscribe() {
-    MQTTClient.subscribe(_prefix + '/v',          _onFullState);
-    MQTTClient.subscribe(_prefix + '/relay/+/v',  _onRelayState);
+    _subFull   = MQTTClient.subscribe(_prefix + '/v',          _onFullState);
+    _subSingle = MQTTClient.subscribe(_prefix + '/relay/+/v',  _onRelayState);
     log('[Relays] subscribed → ' + _prefix);
   }
 
   function _unsubscribe() {
-    MQTTClient.unsubscribe(_prefix + '/v');
-    MQTTClient.unsubscribe(_prefix + '/relay/+/v');
+    if (_subFull)   { _subFull.unsubscribe();   _subFull = null; }
+    if (_subSingle) { _subSingle.unsubscribe(); _subSingle = null; }
   }
 
   /* ── {prefix}/v  full JSON state ──────────────── */
@@ -47,7 +51,7 @@ window.RelayModule = (function () {
         id:    r.id    !== undefined ? r.id : 0,
         name:  r.name  || ('Relay ' + r.id),
         on:    !!r.on,
-        timer: Number(r.timer) || 0
+        timer: Number(r.timer_remaining) || 0
       };
     });
     _pendingState = {};
@@ -60,15 +64,33 @@ window.RelayModule = (function () {
     var parts = topic.split('/');
     var id    = parseInt(parts[parts.length - 2], 10);
     if (isNaN(id)) return;
-    var on = window.AppCoreUtils && window.AppCoreUtils.relayStateFromPayload
-      ? window.AppCoreUtils.relayStateFromPayload(payloadStr)
-      : (payloadStr.trim().toLowerCase() === 'on');
+
+    var payloadObj = null;
+    try { payloadObj = JSON.parse(payloadStr); } catch(e) {}
+    var on = null;
+    var timer = null;
+    if (payloadObj && typeof payloadObj === 'object') {
+      if (typeof payloadObj.on === 'boolean') on = payloadObj.on;
+      else if (typeof payloadObj.on === 'number') on = payloadObj.on !== 0;
+      if (payloadObj.timer_remaining !== undefined) timer = Number(payloadObj.timer_remaining);
+    } else {
+      on = window.AppCoreUtils && window.AppCoreUtils.relayStateFromPayload
+        ? window.AppCoreUtils.relayStateFromPayload(payloadStr)
+        : (payloadStr.trim().toLowerCase() === 'on');
+    }
     if (on === null) return;
+
     var relay = _relays.find(function(r){ return r.id === id; });
     if (relay) {
       relay.on = on;
+      if (!isNaN(timer)) relay.timer = timer;
       if (_pendingState[id] !== undefined && _pendingState[id] === on) delete _pendingState[id];
       _updateCard(id);
+      // restart countdown if timer changed
+      if (timer > 0) {
+        clearInterval(_timers[id]);
+        _startCountdown(id, timer);
+      }
     }
   }
 
@@ -106,7 +128,6 @@ window.RelayModule = (function () {
     var empty = document.getElementById('relay-empty');
     if (!grid) return;
 
-    /* stop all countdowns */
     Object.keys(_timers).forEach(function(k){ clearInterval(_timers[k]); });
     _timers = {};
 
@@ -120,18 +141,14 @@ window.RelayModule = (function () {
 
     if (empty) empty.style.display = 'none';
 
-    /* remove old cards */
     Array.from(grid.children).forEach(function(c){
       if (c.id !== 'relay-empty') c.remove();
     });
 
-    /* add new cards */
     _relays.forEach(function(r){ grid.appendChild(_buildCard(r)); });
 
-    /* start countdowns */
     _relays.forEach(function(r){ if (r.timer > 0) _startCountdown(r.id, r.timer); });
 
-    /* enable pattern run button */
     var btnRun = document.getElementById('btn-pattern-run');
     if (btnRun) btnRun.disabled = !MQTTClient.connected;
   }
@@ -183,6 +200,10 @@ window.RelayModule = (function () {
     if (btn) {
       if (_pendingState[id] !== undefined) btn.textContent = '...';
       else btn.textContent = relay.on ? 'ON' : 'OFF';
+    }
+    var timerEl = document.getElementById('relay-timer-' + id);
+    if (timerEl) {
+      timerEl.textContent = relay.timer > 0 ? _fmtSec(relay.timer) : '';
     }
   }
 
@@ -273,6 +294,7 @@ window.RelayModule = (function () {
     var el = document.getElementById('relay-timer-' + id);
     if (!el) return;
     el.textContent = _fmtSec(remaining);
+    clearInterval(_timers[id]);
     _timers[id] = setInterval(function(){
       remaining--;
       if (!el.isConnected || remaining <= 0) {
@@ -341,7 +363,6 @@ window.RelayModule = (function () {
       var row = document.createElement('div');
       row.className = 'pattern-step';
 
-      /* relay bit checkboxes */
       var maxBit = Math.max(_relays.length, 8);
       var bitsHtml = '';
       for (var b = 0; b < Math.min(maxBit, 16); b++) {
@@ -366,7 +387,6 @@ window.RelayModule = (function () {
           '<span class="pattern-step-label">ms</span>' +
         '</div>';
 
-      /* bit toggles */
       row.querySelectorAll('.pattern-bit').forEach(function(cb){
         cb.addEventListener('change', function(){
           var mask = 0;
@@ -377,12 +397,10 @@ window.RelayModule = (function () {
         });
       });
 
-      /* duration change */
       row.querySelector('.pattern-dur').addEventListener('input', function(e){
         _patternSteps[i].duration_ms = Math.max(50, parseInt(e.target.value,10) || 500);
       });
 
-      /* remove step */
       row.querySelector('.pattern-step-remove').addEventListener('click', function(){
         _patternSteps.splice(i, 1);
         _renderPatternSteps();
@@ -409,9 +427,6 @@ window.RelayModule = (function () {
     if (grid)  { Array.from(grid.children).forEach(function(c){ if (c.id !== 'relay-empty') c.remove(); }); }
   }
 
-  /* ════════════════════════════════════════════════
-     HELPERS
-  ════════════════════════════════════════════════ */
   function _esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
@@ -428,7 +443,7 @@ window.RelayModule = (function () {
       MQTTClient.publish(_prefix + '/ping', '1');
       log('[Relays] init → ' + prefix);
     },
-    onConnected:    function(){ /* prefix set by init() via app.js wrapper */ },
+    onConnected:    function(){},
     onDisconnected: _onDisconnected,
     get relays(){ return _relays; }
   };
@@ -436,7 +451,7 @@ window.RelayModule = (function () {
 })();
 
 /* ════════════════════════════════════════════════════
-   Inject component-specific CSS (keeps layout.css clean)
+   Inject component-specific CSS (unchanged)
 ════════════════════════════════════════════════════ */
 (function(){
   var s = document.createElement('style');
