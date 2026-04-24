@@ -99,13 +99,41 @@ window.RelayModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _toggle(id) {
-    var r = _relays.find(function(x){ return x.id === id; });
-    if (!r) return;
-    _pendingState[id] = !r.on;
-    MQTTClient.publishJSON(_prefix + '/api', { relay: id, on: 't' });
-    log('→ Toggle relay ' + id + ' (pending confirmation)');
-    _updateCard(id);
-  }
+  var r = _relays.find(function(x){ return x.id === id; });
+  if (!r) return;
+  _pendingState[id] = !r.on;
+  MQTTClient.publishJSON(_prefix + '/api', { relay: id, on: 't' });
+  log('→ Toggle relay ' + id + ' (pending confirmation)');
+  _updateCard(id);
+
+  // Flash timeout: if confirmation doesn't arrive in 3s, revert and flash error
+  var timeout = setTimeout(function() {
+    if (_pendingState[id] !== undefined) {
+      delete _pendingState[id];
+      _updateCard(id);
+      var card = document.querySelector('.relay-card[data-id="' + id + '"]');
+      if (card) {
+        card.classList.add('flash-error');
+        setTimeout(function() { card.classList.remove('flash-error'); }, 600);
+      }
+      log('⚠ Relay ' + id + ' toggle timeout – no response', 'warning');
+    }
+  }, 3000);
+
+  // The confirmation will arrive via _onRelayState, which clears pendingState.
+  // Once pending state is cleared, we flash the card.
+  var checkConfirm = setInterval(function() {
+    if (_pendingState[id] === undefined) {
+      clearInterval(checkConfirm);
+      clearTimeout(timeout);
+      var card = document.querySelector('.relay-card[data-id="' + id + '"]');
+      if (card) {
+        card.classList.add('flash-success');
+        setTimeout(function() { card.classList.remove('flash-success'); }, 600);
+      }
+    }
+  }, 100);
+}
 
   function _pulse(id, ms) {
     ms = Math.max(50, parseInt(ms, 10) || 500);
@@ -448,146 +476,4 @@ window.RelayModule = (function () {
     get relays(){ return _relays; }
   };
 
-})();
-
-/* ════════════════════════════════════════════════════
-   Inject component-specific CSS (unchanged)
-════════════════════════════════════════════════════ */
-(function(){
-  var s = document.createElement('style');
-  s.textContent = `
-    .relay-inline-sheet {
-      background: var(--color-surface-2);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 10px;
-      margin-top: 8px;
-      animation: sheet-in .15s ease;
-    }
-    .relay-card.pending {
-      opacity: .75;
-    }
-    .relay-card.pending .relay-toggle {
-      border-style: dashed;
-    }
-    @keyframes sheet-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-
-    .sheet-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--color-text-muted);
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      margin-bottom: 7px;
-    }
-    .sheet-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-bottom: 8px;
-    }
-    .sheet-preset {
-      padding: 4px 9px;
-      border-radius: var(--radius-sm);
-      font-size: 11px;
-      font-weight: 600;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      color: var(--color-text);
-      transition: all var(--transition);
-    }
-    .sheet-preset:hover { border-color: var(--color-accent); color: var(--color-accent); }
-    .sheet-custom-row {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .sheet-input {
-      flex: 1;
-      padding: 6px 9px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      color: var(--color-text);
-      font-size: 13px;
-    }
-    .sheet-input:focus { outline: none; border-color: var(--color-accent); }
-    .sheet-unit { font-size: 11px; color: var(--color-text-muted); flex-shrink: 0; }
-    .sheet-go   { flex-shrink: 0; padding: 6px 14px !important; font-size: 12px !important; }
-
-    .pattern-step {
-      background: var(--color-surface-2);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .pattern-step-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .pattern-step-num {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--color-accent);
-      text-transform: uppercase;
-      letter-spacing: .06em;
-    }
-    .pattern-step-remove {
-      color: var(--color-danger);
-      font-size: 18px;
-      line-height: 1;
-      width: 24px; height: 24px;
-      border-radius: var(--radius-sm);
-      display: flex; align-items: center; justify-content: center;
-      transition: background var(--transition);
-    }
-    .pattern-step-remove:hover { background: rgba(240,106,106,.15); }
-
-    .pattern-bit-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .pattern-bit-label {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      font-size: 10px;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      user-select: none;
-      min-width: 22px;
-    }
-    .pattern-bit-label input {
-      cursor: pointer;
-      accent-color: var(--color-accent);
-      width: 14px; height: 14px;
-    }
-    .pattern-bit-label:has(input:checked) { color: var(--color-accent); font-weight: 700; }
-
-    .pattern-step-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .pattern-dur {
-      width: 80px !important;
-      padding: 5px 8px !important;
-      font-size: 12px !important;
-    }
-
-    .pattern-footer {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-  `;
-  document.head.appendChild(s);
 })();

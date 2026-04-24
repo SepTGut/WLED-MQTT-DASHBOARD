@@ -8,94 +8,84 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>MQTT Controller</title>
 
-  <!-- Tailwind CSS (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Theme variables (unchanged themes.css) -->
+  <!-- Theme variables -->
   <link rel="stylesheet" href="css/themes.css" />
-  <!-- Tiny custom styles (sliders, swatches, animations) -->
+  <!-- All component & layout styles -->
   <link rel="stylesheet" href="css/app.css" />
 
   <!-- Paho MQTT WebSocket client -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 </head>
-<body class="font-sans text-[var(--color-text)] bg-[var(--color-bg)] min-h-dvh overflow-x-hidden transition-colors duration-200">
+<body>
 
-  <!-- ════════════════════════════════════
-       HEADER
-  ════════════════════════════════════ -->
-  <header class="fixed top-0 left-0 right-0 h-14 bg-[var(--header-bg)] border-b border-[var(--header-border)] flex items-center justify-between px-4 z-50 gap-3 pt-[env(safe-area-inset-top,0)]">
-    <div class="flex items-center gap-3 min-w-0">
-      <div class="w-7 h-7 text-[var(--color-accent)] flex-shrink-0" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-full h-full">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-          <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
-        </svg>
-      </div>
-      <span class="text-lg font-semibold tracking-tight truncate">MQTT Controller</span>
+  <!-- HEADER -->
+<header class="app-header">
+  <div class="header-left">
+    <div class="app-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+        <path d="M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+      </svg>
     </div>
-    <div class="flex items-center gap-2 flex-shrink-0">
-      <!-- Connection badge -->
-      <div id="conn-badge" class="conn-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-[var(--color-surface-2)] border border-[var(--color-border)] transition-all duration-200" data-state="disconnected">
-        <span class="conn-dot w-2 h-2 rounded-full bg-[var(--color-text-muted)] transition-colors duration-200"></span>
+    <span class="app-title">MQTT Controller</span>
+  </div>
+  <div class="header-right">
+    <!-- Connection badge + tooltip wrapper -->
+    <div style="position:relative;">
+      <div id="conn-badge" class="conn-badge" data-state="disconnected" title="Click for connection details">
+        <span class="conn-dot"></span>
         <span class="conn-label">Offline</span>
       </div>
-      <!-- Theme toggle -->
-      <button class="icon-btn w-9 h-9 flex items-center justify-center rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-colors duration-200" id="theme-btn" title="Change theme" aria-label="Change theme">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-[18px] h-[18px]">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 2a10 10 0 0 1 0 20"/>
-        </svg>
-      </button>
+      <div id="conn-tooltip" class="conn-tooltip">
+        <div class="tooltip-row"><span>Broker</span><span class="tooltip-value" id="tooltip-broker">—</span></div>
+        <div class="tooltip-row"><span>Connected</span><span class="tooltip-value" id="tooltip-uptime">—</span></div>
+      </div>
     </div>
-  </header>
+    <button class="icon-btn" id="theme-btn" title="Change theme" aria-label="Change theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a10 10 0 0 1 0 20"/>
+      </svg>
+    </button>
+  </div>
+</header>
 
-  <!-- ════════════════════════════════════
-       THEME PANEL (slide-up sheet)
-  ════════════════════════════════════ -->
-  <div id="theme-panel" class="theme-panel hidden fixed inset-0 z-[200] pointer-events-none" role="dialog" aria-modal="true" aria-label="Theme selector">
-    <div class="theme-panel-backdrop absolute inset-0 bg-black/50 backdrop-blur-sm opacity-0 transition-opacity duration-350" id="theme-backdrop"></div>
-    <div class="theme-panel-inner absolute bottom-0 left-0 right-0 bg-[var(--color-surface)] border-t border-[var(--color-border)] rounded-t-xl px-5 pt-5 pb-[calc(20px+env(safe-area-inset-bottom,0))] transform translate-y-full transition-transform duration-350">
-      <p class="font-bold text-lg mb-4 text-center">Choose Theme</p>
-      <div class="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        <!-- theme swatches unchanged -->
-        <button class="theme-swatch flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-all duration-200" data-theme="dark">
-          <span class="swatch-preview w-10 h-10 rounded-lg border border-[var(--color-border)] swatch-dark"></span>
-          <span>Dark</span>
+  <!-- THEME PANEL -->
+  <div id="theme-panel" class="theme-panel hidden" role="dialog" aria-modal="true" aria-label="Theme selector">
+    <div class="theme-panel-backdrop" id="theme-backdrop"></div>
+    <div class="theme-panel-inner">
+      <p class="theme-panel-title">Choose Theme</p>
+      <div class="theme-grid">
+        <button class="theme-swatch" data-theme="dark">
+          <span class="swatch-preview swatch-dark"></span><span>Dark</span>
         </button>
-        <button class="theme-swatch flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-all duration-200" data-theme="light">
-          <span class="swatch-preview w-10 h-10 rounded-lg border border-[var(--color-border)] swatch-light"></span>
-          <span>Light</span>
+        <button class="theme-swatch" data-theme="light">
+          <span class="swatch-preview swatch-light"></span><span>Light</span>
         </button>
-        <button class="theme-swatch flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-all duration-200" data-theme="purple">
-          <span class="swatch-preview w-10 h-10 rounded-lg border border-[var(--color-border)] swatch-purple"></span>
-          <span>Purple</span>
+        <button class="theme-swatch" data-theme="purple">
+          <span class="swatch-preview swatch-purple"></span><span>Purple</span>
         </button>
-        <button class="theme-swatch flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-all duration-200" data-theme="ocean">
-          <span class="swatch-preview w-10 h-10 rounded-lg border border-[var(--color-border)] swatch-ocean"></span>
-          <span>Ocean</span>
+        <button class="theme-swatch" data-theme="ocean">
+          <span class="swatch-preview swatch-ocean"></span><span>Ocean</span>
         </button>
-        <button class="theme-swatch flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-all duration-200" data-theme="amber">
-          <span class="swatch-preview w-10 h-10 rounded-lg border border-[var(--color-border)] swatch-amber"></span>
-          <span>Amber</span>
+        <button class="theme-swatch" data-theme="amber">
+          <span class="swatch-preview swatch-amber"></span><span>Amber</span>
         </button>
-        <button class="theme-swatch flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-all duration-200" data-theme="rose">
-          <span class="swatch-preview w-10 h-10 rounded-lg border border-[var(--color-border)] swatch-rose"></span>
-          <span>Rose</span>
+        <button class="theme-swatch" data-theme="rose">
+          <span class="swatch-preview swatch-rose"></span><span>Rose</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- ════════════════════════════════════
-       MAIN LAYOUT
-  ════════════════════════════════════ -->
-  <main class="mt-14 min-h-[calc(100dvh-56px)] flex flex-col pb-16 lg:flex-row lg:pb-0">
+  <!-- MAIN LAYOUT -->
+  <main class="app-main">
 
     <!-- Sidebar nav (desktop) -->
-    <nav class="tab-bar hidden lg:flex flex-col gap-1 p-4 pr-3 bg-[var(--color-surface)] border-r border-[var(--color-border)] w-50 fixed top-14 left-0 bottom-0 overflow-y-auto z-40" role="tablist" aria-label="Page navigation">
-      <button class="tab-btn active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-all duration-200 w-full text-left bg-[var(--color-accent-dim)] text-[var(--color-accent)]" data-tab="relays" role="tab" aria-selected="true" aria-controls="tab-relays">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-[18px] h-[18px] flex-shrink-0">
+    <nav class="tab-bar" role="tablist">
+      <button class="tab-btn active" data-tab="relays" role="tab" aria-selected="true" aria-controls="tab-relays">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="7" width="20" height="10" rx="2"/>
           <circle cx="7" cy="12" r="2" fill="currentColor" stroke="none"/>
           <circle cx="17" cy="12" r="2"/>
@@ -103,23 +93,23 @@
         </svg>
         <span>Relays</span>
       </button>
-      <button class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-all duration-200 w-full text-left" data-tab="wled" role="tab" aria-selected="false" aria-controls="tab-wled">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-[18px] h-[18px] flex-shrink-0">
+      <button class="tab-btn" data-tab="wled" role="tab" aria-selected="false" aria-controls="tab-wled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="4"/>
           <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
         </svg>
         <span>WLED</span>
       </button>
-      <button class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-all duration-200 w-full text-left" data-tab="sensors" role="tab" aria-selected="false" aria-controls="tab-sensors">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-[18px] h-[18px] flex-shrink-0">
+      <button class="tab-btn" data-tab="sensors" role="tab" aria-selected="false" aria-controls="tab-sensors">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 22V12"/>
           <circle cx="12" cy="7" r="5"/>
           <path d="M9 7a3 3 0 0 1 6 0"/>
         </svg>
         <span>Sensors</span>
       </button>
-      <button class="tab-btn flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] transition-all duration-200 w-full text-left" data-tab="settings" role="tab" aria-selected="false" aria-controls="tab-settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-[18px] h-[18px] flex-shrink-0">
+      <button class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="tab-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
@@ -128,68 +118,47 @@
     </nav>
 
     <!-- Tab content area -->
-    <div class="flex-1 overflow-y-auto p-4 max-w-[860px] mx-auto w-full lg:ml-[200px] lg:p-6">
+    <div class="tab-content">
 
-      <!-- ───────────────────────────────
-           RELAYS TAB
-      ─────────────────────────────── -->
+      <!-- RELAYS TAB -->
       <section id="tab-relays" class="tab-panel active" role="tabpanel">
-
-        <!-- Quick action bar -->
-        <div class="quick-bar flex gap-2 mb-4 flex-wrap">
-          <button class="quick-btn btn-danger inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-[var(--color-surface)] border border-[var(--color-danger)] text-[var(--color-danger)] hover:bg-[rgba(240,106,106,0.1)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex-1 min-w-[90px] justify-center" id="btn-alloff" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4 flex-shrink-0">
-              <path d="M18.36 6.64A9 9 0 1 1 5.64 19.36"/>
-              <path d="M12 2v10"/>
-            </svg>
+        <div class="quick-bar">
+          <button class="quick-btn btn-danger" id="btn-alloff" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64A9 9 0 1 1 5.64 19.36"/><path d="M12 2v10"/></svg>
             All OFF
           </button>
-          <button class="quick-btn btn-success inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-[var(--color-surface)] border border-[var(--color-success)] text-[var(--color-success)] hover:bg-[rgba(61,214,140,0.1)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex-1 min-w-[90px] justify-center" id="btn-allon" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4 flex-shrink-0">
-              <path d="M12 2v10"/>
-              <path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>
-            </svg>
+          <button class="quick-btn btn-success" id="btn-allon" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>
             All ON
           </button>
-          <button class="quick-btn inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex-1 min-w-[90px] justify-center" id="btn-ping" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4 flex-shrink-0">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
+          <button class="quick-btn" id="btn-ping" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
             Ping
           </button>
-          <button class="quick-btn btn-accent inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-[var(--color-surface)] border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent-dim)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex-1 min-w-[90px] justify-center" id="btn-show-pattern" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4 flex-shrink-0">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
+          <button class="quick-btn btn-accent" id="btn-show-pattern" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Pattern
           </button>
         </div>
 
-        <!-- Relay cards grid -->
-        <div id="relay-grid" class="relay-grid grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3 mb-4 lg:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
-          <div class="empty-state flex flex-col items-center justify-center gap-3 py-10 text-[var(--color-text-muted)] text-center col-span-full" id="relay-empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-12 h-12 opacity-40">
-              <rect x="2" y="7" width="20" height="10" rx="2"/>
-              <circle cx="7" cy="12" r="2"/>
-              <circle cx="17" cy="12" r="2"/>
-              <path d="M9 12h6"/>
-            </svg>
-            <p class="text-sm">Connect to broker to see relays</p>
+        <div id="relay-grid" class="relay-grid">
+          <div class="empty-state" id="relay-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/><path d="M9 12h6"/></svg>
+            <p>Connect to broker to see relays</p>
           </div>
         </div>
 
-        <!-- Pattern sequencer (hidden) -->
-        <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3" id="pattern-section" style="display:none">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Pattern Sequencer</span>
-            <button class="chip-btn chip-danger px-2.5 py-1 text-xs font-semibold rounded-full bg-[var(--color-surface-2)] border border-[var(--color-danger)] text-[var(--color-danger)] hover:bg-[rgba(240,106,106,0.1)] transition-all duration-200" id="btn-pattern-stop">■ Stop</button>
+        <div class="section-card" id="pattern-section" style="display:none">
+          <div class="section-header">
+            <span class="section-title">Pattern Sequencer</span>
+            <button class="chip-btn chip-danger" id="btn-pattern-stop">■ Stop</button>
           </div>
-          <div id="pattern-steps" class="pattern-steps flex flex-col gap-2 mb-3"></div>
-          <button class="secondary-btn px-4 py-2 text-sm font-semibold bg-[var(--color-surface-2)] text-[var(--color-text)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border)] transition-all duration-200 mt-2" id="btn-add-step">+ Add Step</button>
-          <div class="pattern-footer flex items-end gap-3 mt-3 flex-wrap">
-            <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)] flex-1">
+          <div id="pattern-steps" class="pattern-steps"></div>
+          <button class="secondary-btn" id="btn-add-step">+ Add Step</button>
+          <div class="pattern-footer">
+            <label class="field-label">
               Repeat
-              <select id="pattern-repeat" class="field-select p-2 text-sm bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] cursor-pointer mt-1 w-full">
+              <select id="pattern-repeat" class="field-select">
                 <option value="0">Once</option>
                 <option value="-1" selected>Infinite</option>
                 <option value="3">3×</option>
@@ -197,213 +166,126 @@
                 <option value="10">10×</option>
               </select>
             </label>
-            <button class="primary-btn px-5 py-2.5 bg-[var(--color-accent)] text-white font-bold text-sm rounded-lg hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200" id="btn-pattern-run" disabled>▶ Run</button>
+            <button class="primary-btn" id="btn-pattern-run" disabled>▶ Run</button>
           </div>
         </div>
       </section>
 
-      <!-- ───────────────────────────────
-           WLED TAB
-      ─────────────────────────────── -->
+      <!-- WLED TAB -->
       <section id="tab-wled" class="tab-panel" role="tabpanel">
-        <div class="empty-state flex flex-col items-center justify-center gap-3 py-10 text-[var(--color-text-muted)] text-center" id="wled-empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-12 h-12 opacity-40">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-          </svg>
-          <p class="text-sm">Connect to broker to control WLED</p>
+        <div class="empty-state" id="wled-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <p>Connect to broker to control WLED</p>
         </div>
-
         <div id="wled-panel" style="display:none">
-          <!-- Power toggle -->
-          <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Power</span>
-              <label class="toggle-switch relative inline-block w-[46px] h-[26px] flex-shrink-0" aria-label="WLED power">
-                <input type="checkbox" id="wled-power" class="opacity-0 w-0 h-0 absolute" />
-                <span class="toggle-knob absolute inset-0 bg-[var(--toggle-track-off)] rounded-full cursor-pointer transition-colors duration-200"></span>
+          <div class="section-card">
+            <div class="wled-power-row">
+              <span class="section-title">Power</span>
+              <label class="toggle-switch" aria-label="WLED power">
+                <input type="checkbox" id="wled-power" />
+                <span class="toggle-knob"></span>
               </label>
             </div>
           </div>
-
-          <!-- Brightness -->
-          <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Brightness</span>
-              <span id="bri-value" class="value-badge text-sm font-semibold text-[var(--color-accent)] bg-[var(--color-accent-dim)] px-2 py-0.5 rounded-full min-w-[38px] text-center">128</span>
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">Brightness</span>
+              <span id="bri-value" class="value-badge">128</span>
             </div>
-            <input type="range" id="wled-bri" class="slider w-full h-1.5 rounded bg-[var(--slider-track)] cursor-pointer" min="0" max="255" value="128" aria-label="Brightness" />
+            <input type="range" id="wled-bri" class="slider" min="0" max="255" value="128" />
           </div>
-
-          <!-- Color -->
-          <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Color</span>
-              <span id="color-hex" class="value-badge mono text-sm font-semibold font-mono text-[var(--color-accent)] bg-[var(--color-accent-dim)] px-2 py-0.5 rounded-full min-w-[38px] text-center">#FF6600</span>
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">Color</span>
+              <span id="color-hex" class="value-badge mono">#FF6600</span>
             </div>
-            <div class="flex items-center gap-4 flex-wrap">
-              <input type="color" id="wled-color" class="color-picker w-11 h-11 rounded-lg border-2 border-[var(--color-border)] bg-transparent cursor-pointer p-0.5 flex-shrink-0" value="#FF6600" aria-label="Color picker" />
-              <div class="color-presets flex gap-2 flex-wrap" id="color-presets" role="group" aria-label="Color presets">
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#FF0000" data-color="#FF0000" title="Red" aria-label="Red"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#FF6600" data-color="#FF6600" title="Orange" aria-label="Orange"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#FFFF00" data-color="#FFFF00" title="Yellow" aria-label="Yellow"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#00FF00" data-color="#00FF00" title="Green" aria-label="Green"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#00FFFF" data-color="#00FFFF" title="Cyan" aria-label="Cyan"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#0000FF" data-color="#0000FF" title="Blue" aria-label="Blue"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#FF00FF" data-color="#FF00FF" title="Magenta" aria-label="Magenta"></button>
-                <button class="color-dot w-7 h-7 rounded-full border-2 border-transparent hover:scale-125 hover:border-[var(--color-text)] transition-all duration-200" style="background:#FFFFFF" data-color="#FFFFFF" title="White" aria-label="White"></button>
+            <div class="color-row">
+              <input type="color" id="wled-color" class="color-picker" value="#FF6600" />
+              <div class="color-presets" id="color-presets">
+                <button class="color-dot" style="background:#FF0000" data-color="#FF0000" title="Red" aria-label="Red"></button>
+                <button class="color-dot" style="background:#FF6600" data-color="#FF6600" title="Orange" aria-label="Orange"></button>
+                <button class="color-dot" style="background:#FFFF00" data-color="#FFFF00" title="Yellow" aria-label="Yellow"></button>
+                <button class="color-dot" style="background:#00FF00" data-color="#00FF00" title="Green" aria-label="Green"></button>
+                <button class="color-dot" style="background:#00FFFF" data-color="#00FFFF" title="Cyan" aria-label="Cyan"></button>
+                <button class="color-dot" style="background:#0000FF" data-color="#0000FF" title="Blue" aria-label="Blue"></button>
+                <button class="color-dot" style="background:#FF00FF" data-color="#FF00FF" title="Magenta" aria-label="Magenta"></button>
+                <button class="color-dot" style="background:#FFFFFF" data-color="#FFFFFF" title="White" aria-label="White"></button>
               </div>
             </div>
           </div>
-
-          <!-- Speed & Intensity (kept for UI, local only) -->
-          <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Speed</span>
-              <span id="spd-value" class="value-badge text-sm font-semibold text-[var(--color-accent)] bg-[var(--color-accent-dim)] px-2 py-0.5 rounded-full min-w-[38px] text-center">128</span>
-            </div>
-            <input type="range" id="wled-spd" class="slider w-full h-1.5 rounded bg-[var(--slider-track)] cursor-pointer" min="0" max="255" value="128" aria-label="Effect speed" />
-            <div class="flex items-center justify-between mt-4 mb-3">
-              <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Intensity</span>
-              <span id="int-value" class="value-badge text-sm font-semibold text-[var(--color-accent)] bg-[var(--color-accent-dim)] px-2 py-0.5 rounded-full min-w-[38px] text-center">128</span>
-            </div>
-            <input type="range" id="wled-int" class="slider w-full h-1.5 rounded bg-[var(--slider-track)] cursor-pointer" min="0" max="255" value="128" aria-label="Effect intensity" />
+          <div class="section-card">
+            <div class="section-header"><span class="section-title">Speed</span><span id="spd-value" class="value-badge">128</span></div>
+            <input type="range" id="wled-spd" class="slider" min="0" max="255" value="128" />
+            <div class="section-header" style="margin-top:16px"><span class="section-title">Intensity</span><span id="int-value" class="value-badge">128</span></div>
+            <input type="range" id="wled-int" class="slider" min="0" max="255" value="128" />
           </div>
         </div>
       </section>
 
-      <!-- ───────────────────────────────
-           SENSORS TAB
-      ─────────────────────────────── -->
+      <!-- SENSORS TAB -->
       <section id="tab-sensors" class="tab-panel" role="tabpanel">
-        <div class="empty-state flex flex-col items-center justify-center gap-3 py-10 text-[var(--color-text-muted)] text-center" id="sensors-empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-12 h-12 opacity-40">
-            <path d="M12 22V12"/>
-            <circle cx="12" cy="7" r="5"/>
-            <path d="M9 7a3 3 0 0 1 6 0"/>
-          </svg>
-          <p class="text-sm">No sensors reported yet</p>
+        <div class="empty-state" id="sensors-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22V12"/><circle cx="12" cy="7" r="5"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+          <p>No sensors reported yet</p>
         </div>
-        <div id="sensor-grid" class="sensor-grid grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3"></div>
+        <div id="sensor-grid" class="sensor-grid"></div>
       </section>
 
-      <!-- ───────────────────────────────
-           SETTINGS TAB
-      ─────────────────────────────── -->
+      <!-- SETTINGS TAB -->
       <section id="tab-settings" class="tab-panel" role="tabpanel">
-        <!-- Broker settings -->
-        <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3">
-          <p class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Broker</p>
-          <div class="field-group flex flex-col gap-3 mt-3">
-            <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)]">
-              Host
-              <input type="text" id="cfg-host" class="field-input p-2.5 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm placeholder:text-[var(--color-text-muted)] placeholder:opacity-70 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-accent-dim)] transition-all duration-200 w-full"
-                     placeholder="broker.hivemq.com" value="broker.hivemq.com"
-                     autocomplete="off" spellcheck="false" />
-            </label>
-            <div class="field-row flex gap-3 items-end flex-wrap">
-              <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)] flex-1">
-                Port
-                <input type="number" id="cfg-port" class="field-input p-2.5 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm placeholder:text-[var(--color-text-muted)] placeholder:opacity-70 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-accent-dim)] transition-all duration-200 w-full"
-                       placeholder="8884" value="8884" min="1" max="65535" />
-              </label>
-              <label class="tls-toggle flex flex-row items-center gap-2 pb-2.5 text-sm whitespace-nowrap">
-                <input type="checkbox" id="cfg-tls" checked />
-                <span>WSS / TLS</span>
-              </label>
+        <div class="section-card">
+          <p class="section-title">Broker</p>
+          <div class="field-group">
+            <label class="field-label">Host <input type="text" id="cfg-host" class="field-input" placeholder="broker.hivemq.com" value="broker.hivemq.com" /></label>
+            <div class="field-row">
+              <label class="field-label">Port <input type="number" id="cfg-port" class="field-input" placeholder="8884" value="8884" min="1" max="65535" /></label>
+              <label class="tls-toggle"><input type="checkbox" id="cfg-tls" checked /> <span>WSS / TLS</span></label>
             </div>
-            <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)]">
-              Username <span class="muted text-sm text-[var(--color-text-muted)]">(optional)</span>
-              <input type="text" id="cfg-user" class="field-input p-2.5 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm placeholder:text-[var(--color-text-muted)] placeholder:opacity-70 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-accent-dim)] transition-all duration-200 w-full"
-                     placeholder="leave blank if none" autocomplete="off" />
-            </label>
-            <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)]">
-              Password <span class="muted text-sm text-[var(--color-text-muted)]">(optional)</span>
-              <input type="password" id="cfg-pass" class="field-input p-2.5 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm placeholder:text-[var(--color-text-muted)] placeholder:opacity-70 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-accent-dim)] transition-all duration-200 w-full"
-                     placeholder="leave blank if none" />
-            </label>
-            <label class="tls-toggle flex flex-row items-center gap-2 pb-2.5 text-sm whitespace-nowrap">
-              <input type="checkbox" id="cfg-remember-pass" />
-              <span>Remember Password (local only)</span>
-            </label>
+            <label class="field-label">Username <span class="muted">(optional)</span> <input type="text" id="cfg-user" class="field-input" placeholder="leave blank if none" /></label>
+            <label class="field-label">Password <span class="muted">(optional)</span> <input type="password" id="cfg-pass" class="field-input" placeholder="leave blank if none" /></label>
+            <label class="tls-toggle"><input type="checkbox" id="cfg-remember-pass" /> <span>Remember Password (local only)</span></label>
           </div>
         </div>
-
-        <!-- Topic settings -->
-        <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 mb-3">
-          <p class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Topics</p>
-          <div class="field-group flex flex-col gap-3 mt-3">
-            <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)]">
-              Relay Controller Prefix
-              <input type="text" id="cfg-relay-prefix" class="field-input p-2.5 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm placeholder:text-[var(--color-text-muted)] placeholder:opacity-70 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-accent-dim)] transition-all duration-200 w-full"
-                     placeholder="home/relay" value="home/relay"
-                     autocomplete="off" spellcheck="false" />
-              <span class="field-hint text-xs text-[var(--color-text-muted)] mt-0.5">Default: <code class="font-mono text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">home/relay</code></span>
-            </label>
-            <label class="field-label flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-muted)]">
-              WLED Device Topic
-              <input type="text" id="cfg-wled-prefix" class="field-input p-2.5 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg text-[var(--color-text)] text-sm placeholder:text-[var(--color-text-muted)] placeholder:opacity-70 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-accent-dim)] transition-all duration-200 w-full"
-                     placeholder="wled/my_wled" value="wled/my_wled"
-                     autocomplete="off" spellcheck="false" />
-              <span class="field-hint text-xs text-[var(--color-text-muted)] mt-0.5">Match your WLED MQTT device topic</span>
-            </label>
+        <div class="section-card">
+          <p class="section-title">Topics</p>
+          <div class="field-group">
+            <label class="field-label">Relay Controller Prefix <input type="text" id="cfg-relay-prefix" class="field-input" placeholder="home/relay" value="home/relay" /><span class="field-hint">Default: <code>home/relay</code></span></label>
+            <label class="field-label">WLED Device Topic <input type="text" id="cfg-wled-prefix" class="field-input" placeholder="wled/my_wled" value="wled/my_wled" /><span class="field-hint">Match your WLED MQTT device topic</span></label>
           </div>
         </div>
-
-        <!-- Connect / Disconnect -->
-        <div class="flex flex-col gap-2 mb-4">
-          <button class="primary-btn px-5 py-2.5 bg-[var(--color-accent)] text-white font-bold text-sm rounded-lg hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 w-full" id="btn-connect">Connect</button>
-          <button class="danger-btn px-5 py-2.5 bg-transparent text-[var(--color-danger)] font-bold text-sm border border-[var(--color-danger)] rounded-lg hover:bg-[rgba(240,106,106,0.1)] disabled:opacity-35 disabled:cursor-not-allowed transition-all duration-200 w-full" id="btn-disconnect" disabled>Disconnect</button>
+        <div class="settings-actions">
+          <button class="primary-btn full-width" id="btn-connect">Connect</button>
+          <button class="danger-btn full-width" id="btn-disconnect" disabled>Disconnect</button>
         </div>
-
-        <!-- Activity log -->
-        <div class="section-card bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Activity Log</span>
-            <button class="chip-btn px-2.5 py-1 text-xs font-semibold rounded-full bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-text-muted)] transition-all duration-200" id="btn-clear-log">Clear</button>
-          </div>
-          <div id="log-output" class="log-output bg-[var(--log-bg)] rounded-lg p-3 font-mono text-xs text-[var(--log-text)] max-h-60 overflow-y-auto flex flex-col gap-0.5" role="log" aria-live="polite"></div>
+        <div class="section-card">
+          <div class="section-header"><span class="section-title">Activity Log</span><button class="chip-btn" id="btn-clear-log">Clear</button></div>
+          <div id="log-output" class="log-output" role="log" aria-live="polite"></div>
         </div>
       </section>
-    </div><!-- /tab-content -->
+    </div>
   </main>
 
-  <!-- ════════════════════════════════════
-       BOTTOM NAV (mobile only)
-  ════════════════════════════════════ -->
-  <nav class="bottom-nav fixed bottom-0 left-0 right-0 h-16 bg-[var(--bnav-bg)] border-t border-[var(--bnav-border)] flex items-stretch z-50 pb-[env(safe-area-inset-bottom,0)] lg:hidden" aria-label="Main navigation">
-    <button class="bnav-btn active flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium tracking-wide text-[var(--bnav-active)] transition-colors duration-200" data-tab="relays" aria-label="Relays">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-        <rect x="2" y="7" width="20" height="10" rx="2"/>
-        <circle cx="7" cy="12" r="2" fill="currentColor" stroke="none"/>
-        <circle cx="17" cy="12" r="2"/>
-      </svg>
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="bnav-btn active" data-tab="relays" aria-label="Relays">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="7" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="17" cy="12" r="2"/></svg>
       <span>Relays</span>
     </button>
-    <button class="bnav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium tracking-wide text-[var(--color-text-muted)] transition-colors duration-200" data-tab="wled" aria-label="WLED">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-        <circle cx="12" cy="12" r="4"/>
-        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-      </svg>
+    <button class="bnav-btn" data-tab="wled" aria-label="WLED">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       <span>WLED</span>
     </button>
-    <button class="bnav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium tracking-wide text-[var(--color-text-muted)] transition-colors duration-200" data-tab="sensors" aria-label="Sensors">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-        <path d="M12 22V12"/>
-        <circle cx="12" cy="7" r="5"/>
-      </svg>
+    <button class="bnav-btn" data-tab="sensors" aria-label="Sensors">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12"/><circle cx="12" cy="7" r="5"/></svg>
       <span>Sensors</span>
     </button>
-    <button class="bnav-btn flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium tracking-wide text-[var(--color-text-muted)] transition-colors duration-200" data-tab="settings" aria-label="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
+    <button class="bnav-btn" data-tab="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>Settings</span>
     </button>
   </nav>
 
-  <!-- JavaScript (order matters) -->
+  <!-- JavaScript -->
   <script src="js/core-utils.js"></script>
   <script src="js/mqtt.js"></script>
   <script src="js/relays.js"></script>
