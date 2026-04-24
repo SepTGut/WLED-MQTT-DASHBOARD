@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════════
-   mqtt.js  —  MQTT connection manager
+   mqtt.js  —  MQTT connection manager (mqtt.js client)
    ─────────────────────────────────────────────────────
-   Wraps the Paho MQTT (1.x) WebSocket client.
+   Wraps the mqtt.js WebSocket library.
 
-   Public API used by other modules:
+   Public API (unchanged):
      MQTTClient.connect(cfg)
      MQTTClient.disconnect()
      MQTTClient.publish(topic, payload, retained?)
@@ -13,20 +13,16 @@
 
 window.MQTTClient = (function () {
 
-  /* ── internal state ─────────────────────────────── */
   let _client      = null;
   let _connected   = false;
   let _cfg         = null;
   let _reconnTimer = null;
   let _retryAttempt = 0;
-  const _maxRetries = Infinity;   // keep trying forever
+  const _maxRetries = Infinity;
 
-  // topic pattern → array of { fn, subId }
-  const _subs = {};
-  // deduplication cache
+  const _subs = {};           // pattern → [ { fn, subId } ]
   const _lastPayload = {};
 
-  /* ── helpers ────────────────────────────────────── */
   function _log(msg, level = 'info') {
     window.AppLog && window.AppLog[level] && window.AppLog[level](msg);
     console.log(`[MQTT][${level}]`, msg);
@@ -36,7 +32,6 @@ window.MQTTClient = (function () {
     return 'mqttctrl_' + Math.random().toString(36).slice(2, 10);
   }
 
-  /* ── topic matching (supports # and + wildcards) ── */
   function _topicMatches(pattern, topic) {
     if (window.AppCoreUtils && window.AppCoreUtils.mqttTopicMatches) {
       return window.AppCoreUtils.mqttTopicMatches(pattern, topic);
@@ -73,7 +68,6 @@ window.MQTTClient = (function () {
     }, waitMs);
   }
 
-  /* ── dispatch incoming message to subscribers ───── */
   function _dispatch(topic, payloadStr) {
     Object.keys(_subs).forEach(pattern => {
       if (_topicMatches(pattern, topic)) {
@@ -85,19 +79,16 @@ window.MQTTClient = (function () {
     });
   }
 
-  /* ── re-subscribe all registered patterns ───────── */
   function _resubscribeAll() {
     Object.keys(_subs).forEach(pattern => {
-      try {
-        _client.subscribe(pattern, { qos: 0 });
-        _log(`↩ Re-subscribed: ${pattern}`);
-      } catch (e) {
-        _log(`Subscribe error: ${pattern} — ${e}`, 'error');
-      }
+      _client.subscribe(pattern, { qos: 0 }, (err) => {
+        if (err) _log(`Subscribe error: ${pattern} — ${err}`, 'error');
+        else _log(`↩ Re-subscribed: ${pattern}`);
+      });
     });
   }
 
-  /* ── Paho callbacks ─────────────────────────────── */
+  /* ══════ CALLBACKS ══════ */
   function _onConnect() {
     _connected = true;
     _retryAttempt = 0;
@@ -119,90 +110,78 @@ window.MQTTClient = (function () {
     window.SensorModule && window.SensorModule.onConnected && window.SensorModule.onConnected();
   }
 
-  function _onConnectionLost(res) {
+  function _onClose() {
+    if (!_connected) return;
     _connected = false;
-    const msg = res.errorMessage || 'unknown';
-    _log(`Disconnected: ${msg}`, res.errorCode === 0 ? 'info' : 'error');
-    window.setConnectionState && window.setConnectionState(
-      res.errorCode === 0 ? 'disconnected' : 'error'
-    );
+    _log('Disconnected', 'error');
+    window.setConnectionState && window.setConnectionState('error');
 
     window.RelayModule && window.RelayModule.onDisconnected && window.RelayModule.onDisconnected();
     window.WLEDModule  && window.WLEDModule.onDisconnected  && window.WLEDModule.onDisconnected();
     window.SensorModule && window.SensorModule.onDisconnected && window.SensorModule.onDisconnected();
 
-    if (res.errorCode !== 0 && _cfg) {
+    // Reconnect if not user-initiated
+    if (_cfg) {
       _scheduleReconnect('Reconnecting');
     }
   }
 
-  function _onMessageArrived(message) {
-    const topic   = message.destinationName;
-    const payload = message.payloadString;
-    // Deduplicate consecutive identical payloads
-    if (_lastPayload[topic] === payload) return;
-    _lastPayload[topic] = payload;
-    _dispatch(topic, payload);
+  function _onMessage(topic, payload) {
+    const payloadStr = payload.toString();
+    if (_lastPayload[topic] === payloadStr) return;
+    _lastPayload[topic] = payloadStr;
+    _dispatch(topic, payloadStr);
   }
 
-  /* ── low-level connect ──────────────────────────── */
+  function _onError(err) {
+    _log(`MQTT error: ${err.message || err}`, 'error');
+  }
+
+  /* ══════ CONNECT ══════ */
   function _doConnect(cfg) {
     if (_client) {
-      try { _client.disconnect(); } catch (_) {}
+      _client.end(true);
       _client = null;
     }
 
-    const clientId = _uniqueClientId();
     const useSSL   = !!cfg.useTLS;
+    const protocol = useSSL ? 'wss' : 'ws';
+    const url = `${protocol}://${cfg.host}:${cfg.port}/mqtt`;
 
-    _log(`Connecting to ${useSSL ? 'wss' : 'ws'}://${cfg.host}:${cfg.port} (${clientId})`);
+    _log(`Connecting to ${url}`);
+
+    const opts = {
+      clientId: _uniqueClientId(),
+      keepalive: 30,
+      clean: true,
+      reconnectPeriod: 0,          // manual reconnect
+      username: cfg.username || undefined,
+      password: cfg.password || undefined,
+      will: undefined
+    };
+
+    const relayPrefix = _getRelayPrefix();
+    if (relayPrefix) {
+      opts.will = {
+        topic: `${relayPrefix}/presence`,
+        payload: 'offline',
+        qos: 0,
+        retain: false
+      };
+    }
 
     try {
-      _client = new Paho.MQTT.Client(cfg.host, Number(cfg.port), '/mqtt', clientId);
+      _client = mqtt.connect(url, opts);
     } catch(e) {
-      _log(`Failed to create Paho client: ${e}`, 'error');
+      _log(`Create client error: ${e}`, 'error');
       window.setConnectionState && window.setConnectionState('error');
       return;
     }
 
-    _client.onConnectionLost = _onConnectionLost;
-    _client.onMessageArrived = _onMessageArrived;
-
-    const opts = {
-      useSSL,
-      timeout:   10,
-      keepAliveInterval: 30,
-      cleanSession: true,
-      onSuccess: _onConnect,
-      onFailure: (err) => {
-        _log(`Connection failed: ${err.errorMessage}`, 'error');
-        window.setConnectionState && window.setConnectionState('error');
-        _scheduleReconnect('Retrying');
-      }
-    };
-
-    if (cfg.username) opts.userName = cfg.username;
-    if (cfg.password) opts.password = cfg.password;
-
-    const relayPrefix = _getRelayPrefix();
-    if (relayPrefix) {
-      const will = new Paho.MQTT.Message('offline');
-      will.destinationName = `${relayPrefix}/presence`;
-      will.retained = false;
-      opts.willMessage = will;
-    }
-
-    try {
-      _client.connect(opts);
-    } catch(e) {
-      _log(`Connect error: ${e}`, 'error');
-      window.setConnectionState && window.setConnectionState('error');
-    }
-  }
-
-  function _getRelayPrefix() {
-    const el = document.getElementById('cfg-relay-prefix');
-    return el ? (el.value.trim() || 'home/relay') : 'home/relay';
+    _client.on('connect', _onConnect);
+    _client.on('close', _onClose);
+    _client.on('message', _onMessage);
+    _client.on('error', _onError);
   }
 
   function pub(topic, payload, retained = false) {
@@ -210,24 +189,19 @@ window.MQTTClient = (function () {
       _log(`Publish skipped (not connected): ${topic}`, 'warning');
       return false;
     }
-    try {
-      const msg = new Paho.MQTT.Message(String(payload));
-      msg.destinationName = topic;
-      msg.retained = retained;
-      msg.qos = 0;
-      _client.send(msg);
-      return true;
-    } catch(e) {
-      _log(`Publish error on ${topic}: ${e}`, 'error');
-      return false;
-    }
+    _client.publish(topic, String(payload), { qos: 0, retain: retained }, (err) => {
+      if (err) _log(`Publish error on ${topic}: ${err}`, 'error');
+    });
+    return true;
   }
 
-  /* ══════════════════════════════════════════════════
-     PUBLIC API
-  ══════════════════════════════════════════════════ */
-  return {
+  function _getRelayPrefix() {
+    const el = document.getElementById('cfg-relay-prefix');
+    return el ? (el.value.trim() || 'home/relay') : 'home/relay';
+  }
 
+  /* ══════ PUBLIC API ══════ */
+  return {
     get connected() { return _connected; },
 
     connect(cfg) {
@@ -241,17 +215,16 @@ window.MQTTClient = (function () {
       _cfg = null;
       _retryAttempt = 0;
 
-      if (_client && _connected) {
+      if (_client) {
         const relayPrefix = _getRelayPrefix();
-        if (relayPrefix) {
+        if (relayPrefix && _connected) {
           try { pub(`${relayPrefix}/presence`, 'offline', false); } catch (_) {}
         }
-        try { _client.disconnect(); } catch (_) {}
+        _client.end(true);
+        _client = null;
       }
 
       _connected = false;
-      _client    = null;
-      // Clear dedup cache on disconnect
       Object.keys(_lastPayload).forEach(k => delete _lastPayload[k]);
     },
 
@@ -262,16 +235,15 @@ window.MQTTClient = (function () {
       return pub(topic, str, retained);
     },
 
-    /* subscribe(topic, callback) → { unsubscribe }
-       Returns a handle to safely unsubscribe only this callback. */
     subscribe(topic, callback) {
       if (!_subs[topic]) _subs[topic] = [];
       const entry = { fn: callback, subId: Math.random().toString(36).slice(2, 8) };
       _subs[topic].push(entry);
 
       if (_client && _connected) {
-        try { _client.subscribe(topic, { qos: 0 }); }
-        catch(e) { _log(`Subscribe error: ${topic} — ${e}`, 'error'); }
+        _client.subscribe(topic, { qos: 0 }, (err) => {
+          if (err) _log(`Subscribe error: ${topic} — ${err}`, 'error');
+        });
       }
 
       return {
@@ -281,18 +253,17 @@ window.MQTTClient = (function () {
           if (_subs[topic].length === 0) {
             delete _subs[topic];
             if (_client && _connected) {
-              try { _client.unsubscribe(topic); } catch (_) {}
+              _client.unsubscribe(topic);
             }
           }
         }
       };
     },
 
-    /* unsubscribe(topic) — legacy bulk remove (still works) */
     unsubscribe(topic) {
       delete _subs[topic];
       if (_client && _connected) {
-        try { _client.unsubscribe(topic); } catch (_) {}
+        _client.unsubscribe(topic);
       }
     },
 

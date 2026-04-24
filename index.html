@@ -8,13 +8,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>MQTT Controller</title>
 
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f1117" />
+
   <!-- Theme variables -->
   <link rel="stylesheet" href="css/themes.css" />
   <!-- All component & layout styles -->
   <link rel="stylesheet" href="css/app.css" />
 
-  <!-- Paho MQTT WebSocket client -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <!-- ⚠️ Replaced: mqtt.js instead of Paho -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
@@ -287,10 +291,20 @@
 
   <!-- JavaScript -->
   <script src="js/core-utils.js"></script>
+  <!-- ⚠️ Use new mqtt.js (mqtt.js client) -->
   <script src="js/mqtt.js"></script>
   <script src="js/relays.js"></script>
   <script src="js/wled.js"></script>
   <script src="js/sensors.js"></script>
   <script src="js/app.js"></script>
+
+  <!-- Register service worker for PWA offline support -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(e => console.log('SW registration failed', e));
+      });
+    }
+  </script>
 </body>
 </html>
