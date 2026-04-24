@@ -287,6 +287,8 @@ window.AppLog = (function () {
 })();
 
 
+/* ... (all previous code exactly as in your file) ... */
+
 /* ══════════════════════════════════════════════════════
    6. QUICK-BAR ACTIONS  (relay tab)
 ══════════════════════════════════════════════════════ */
@@ -295,47 +297,28 @@ window.AppLog = (function () {
     return (document.getElementById('cfg-relay-prefix').value || 'home/relay').trim();
   }
 
-  // 👇 cooldown function that disables All ON/OFF buttons briefly
-  var quickCooldown = null;
-  function tempDisableAllButtons() {
-    var alloff = document.getElementById('btn-alloff');
-    var allon  = document.getElementById('btn-allon');
-    if (alloff) alloff.disabled = true;
-    if (allon)  allon.disabled = true;
-    if (quickCooldown) clearTimeout(quickCooldown);
-    quickCooldown = setTimeout(function() {
-      if (alloff) alloff.disabled = false;
-      if (allon)  allon.disabled = false;
-    }, 1500);   // 1.5 seconds cooldown
-  }
-  window.tempDisableAllButtons = tempDisableAllButtons;
-
-  document.getElementById('btn-alloff').addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (!confirm('Turn ALL relays OFF?')) return;
+  document.getElementById('btn-alloff').addEventListener('click', function () {
     AppLog.info('→ All relays OFF');
     MQTTClient.publishJSON(relayPrefix() + '/api', { on: false });
   });
 
-  document.getElementById('btn-allon').addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (!confirm('Turn ALL relays ON?')) return;
+  document.getElementById('btn-allon').addEventListener('click', function () {
     AppLog.info('→ All relays ON');
     MQTTClient.publishJSON(relayPrefix() + '/api', { on: true });
   });
 
-  document.getElementById('btn-ping').addEventListener('click', function (e) {
-    e.stopPropagation();
+  document.getElementById('btn-ping').addEventListener('click', function () {
     AppLog.info('→ Ping');
     MQTTClient.publish(relayPrefix() + '/ping', '1');
   });
 
-  document.getElementById('btn-show-pattern').addEventListener('click', function (e) {
-    e.stopPropagation();
+  document.getElementById('btn-show-pattern').addEventListener('click', function () {
     var sec = document.getElementById('pattern-section');
     if (sec) sec.style.display = (sec.style.display === 'none' ? '' : 'none');
   });
 })();
+
+/* ... (rest of app.js unchanged) ... */
 
 /* ══════════════════════════════════════════════════════
    7. MODULE WIRING  —  inject prefixes on connect
