@@ -1,4 +1,0 @@
-{"timestamp":"00:00:00.558","source":"Server","level":"WARN","message":"⚠ Turbopack's filesystem cache has been deleted as the result of a user request. Builds or page loads may be slower as a result."}
-{"timestamp":"00:00:00.701","source":"Server","level":"LOG","message":""}
-{"timestamp":"00:00:02.984","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
-{"timestamp":"00:00:03.083","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
