@@ -21,6 +21,7 @@ window.RelayModule = (function () {
   /* ── subscription handles ───────────────────────── */
   let _subFull   = null;
   let _subSingle = null;
+  let _subDetail = null;
 
   /* ── logging shortcut ───────────────────────────── */
   const log = (m, lvl='info') => window.AppLog && AppLog[lvl](m);
@@ -30,14 +31,16 @@ window.RelayModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _subscribe() {
-    _subFull   = MQTTClient.subscribe(_prefix + '/v',          _onFullState);
-    _subSingle = MQTTClient.subscribe(_prefix + '/relay/+/v',  _onRelayState);
+    _subFull   = MQTTClient.subscribe(_prefix + '/v',              _onFullState);
+    _subSingle = MQTTClient.subscribe(_prefix + '/relay/+/v',      _onRelayState);
+    _subDetail = MQTTClient.subscribe(_prefix + '/relay/+/detail', _onRelayDetail);
     log('[Relays] subscribed → ' + _prefix);
   }
 
   function _unsubscribe() {
     if (_subFull)   { _subFull.unsubscribe();   _subFull = null; }
     if (_subSingle) { _subSingle.unsubscribe(); _subSingle = null; }
+    if (_subDetail) { _subDetail.unsubscribe(); _subDetail = null; }
   }
 
   /* ── {prefix}/v  full JSON state ──────────────── */
@@ -45,14 +48,18 @@ window.RelayModule = (function () {
     let json;
     try { json = JSON.parse(payloadStr); }
     catch (e) { log('[Relays] bad JSON: ' + e, 'error'); return; }
-    if (!Array.isArray(json.relays)) return;
-    _relays = json.relays.map(function(r) {
-      return {
-        id:    r.id    !== undefined ? r.id : 0,
-        name:  r.name  || ('Relay ' + r.id),
-        on:    !!r.on,
-        timer: Number(r.timer_remaining) || 0
-      };
+    var relays = window.AppCoreUtils && window.AppCoreUtils.normalizeRelayList
+      ? window.AppCoreUtils.normalizeRelayList(json)
+      : [];
+    if (!relays.length && !Array.isArray(json.relays) && !Array.isArray(json.r)) return;
+
+    _relays = relays.map(function(next) {
+      var existing = _relays.find(function(r){ return r.id === next.id; });
+      if (existing) {
+        if (!next.name || next.name === ('Relay ' + next.id)) next.name = existing.name;
+        next.timer = next.timer || existing.timer || 0;
+      }
+      return next;
     });
     _pendingState = {};
     _render();
@@ -69,10 +76,20 @@ window.RelayModule = (function () {
     try { payloadObj = JSON.parse(payloadStr); } catch(e) {}
     var on = null;
     var timer = null;
+    var name = null;
     if (payloadObj && typeof payloadObj === 'object') {
       if (typeof payloadObj.on === 'boolean') on = payloadObj.on;
       else if (typeof payloadObj.on === 'number') on = payloadObj.on !== 0;
-      if (payloadObj.timer_remaining !== undefined) timer = Number(payloadObj.timer_remaining);
+      else if (typeof payloadObj.on === 'string') {
+        on = window.AppCoreUtils && window.AppCoreUtils.relayIsOnPayload
+          ? window.AppCoreUtils.relayIsOnPayload(payloadObj.on)
+          : payloadObj.on.trim().toLowerCase() === 'on';
+      }
+      if (payloadObj.tr !== undefined) timer = Number(payloadObj.tr);
+      else if (payloadObj.timer_remaining !== undefined) timer = Number(payloadObj.timer_remaining);
+      else if (payloadObj.timer !== undefined) timer = Number(payloadObj.timer);
+      if (payloadObj.n !== undefined) name = payloadObj.n;
+      else if (payloadObj.name !== undefined) name = payloadObj.name;
     } else {
       on = window.AppCoreUtils && window.AppCoreUtils.relayStateFromPayload
         ? window.AppCoreUtils.relayStateFromPayload(payloadStr)
@@ -83,6 +100,7 @@ window.RelayModule = (function () {
     var relay = _relays.find(function(r){ return r.id === id; });
     if (relay) {
       relay.on = on;
+      if (name) relay.name = name;
       if (!isNaN(timer)) relay.timer = timer;
       if (_pendingState[id] !== undefined && _pendingState[id] === on) delete _pendingState[id];
       _updateCard(id);
@@ -91,6 +109,47 @@ window.RelayModule = (function () {
         clearInterval(_timers[id]);
         _startCountdown(id, timer);
       }
+    } else {
+      _relays.push({
+        id: id,
+        name: name || ('Relay ' + id),
+        on: on,
+        timer: !isNaN(timer) ? timer : 0
+      });
+      _render();
+    }
+  }
+
+  function _onRelayDetail(payloadStr, topic) {
+    var parts = topic.split('/');
+    var id    = parseInt(parts[parts.length - 2], 10);
+    if (isNaN(id)) return;
+
+    var detail;
+    try { detail = JSON.parse(payloadStr); } catch(e) { return; }
+    if (!detail || typeof detail !== 'object') return;
+
+    var on = window.AppCoreUtils && window.AppCoreUtils.relayStateFromPayload
+      ? window.AppCoreUtils.relayStateFromPayload(payloadStr)
+      : !!detail.on;
+    var timer = window.AppCoreUtils && window.AppCoreUtils.relayTimerFromObject
+      ? window.AppCoreUtils.relayTimerFromObject(detail)
+      : Number(detail.timer_remaining) || 0;
+    var relay = _relays.find(function(r){ return r.id === id; });
+
+    if (relay) {
+      relay.name = detail.name || relay.name;
+      if (on !== null) relay.on = on;
+      relay.timer = timer;
+      _updateCard(id);
+    } else {
+      _relays.push({
+        id: id,
+        name: detail.name || ('Relay ' + id),
+        on: on === null ? false : on,
+        timer: timer
+      });
+      _render();
     }
   }
 
@@ -105,7 +164,7 @@ window.RelayModule = (function () {
     if (_pendingState[id] !== undefined) return;
 
     _pendingState[id] = !r.on;
-    MQTTClient.publishJSON(_prefix + '/api', { relay: id, on: 't' });
+    MQTTClient.publish(_prefix + '/relay/' + id + '/set', 'toggle');
     log('→ Toggle relay ' + id + ' (pending confirmation)');
 
     // Flash timeout: if confirmation doesn't arrive in 3s, revert and flash error
@@ -139,13 +198,13 @@ window.RelayModule = (function () {
 
   function _pulse(id, ms) {
     ms = Math.max(50, parseInt(ms, 10) || 500);
-    MQTTClient.publishJSON(_prefix + '/api', { relay: id, pulse: ms });
+    MQTTClient.publishJSON(_prefix + '/set/relay/' + id, { pulse: ms });
     log('→ Pulse relay ' + id + ' for ' + ms + ' ms');
   }
 
   function _setTimer(id, sec) {
     sec = Math.max(1, parseInt(sec, 10) || 10);
-    MQTTClient.publishJSON(_prefix + '/api', { relay: id, timer: sec });
+    MQTTClient.publishJSON(_prefix + '/set/relay/' + id, { timer: sec });
     log('→ Timer relay ' + id + ' for ' + sec + ' s');
   }
 
@@ -235,6 +294,8 @@ window.RelayModule = (function () {
       if (_pendingState[id] !== undefined) btn.textContent = '...';
       else btn.textContent = relay.on ? 'ON' : 'OFF';
     }
+    var nameEl = card.querySelector('.relay-name');
+    if (nameEl) nameEl.textContent = relay.name;
     var timerEl = document.getElementById('relay-timer-' + id);
     if (timerEl) {
       timerEl.textContent = relay.timer > 0 ? _fmtSec(relay.timer) : '';
@@ -374,12 +435,12 @@ window.RelayModule = (function () {
     btnRun && btnRun.addEventListener('click', function(){
       if (!_patternSteps.length){ log('[Pattern] No steps', 'warning'); return; }
       var repeat = parseInt(document.getElementById('pattern-repeat').value, 10);
-      MQTTClient.publishJSON(_prefix + '/api', { pattern: { steps: _patternSteps, repeat: repeat } });
+      MQTTClient.publishJSON(_prefix + '/set/pattern/run', { steps: _patternSteps, repeat: repeat });
       log('→ Pattern started (' + _patternSteps.length + ' steps, repeat=' + repeat + ')');
     });
 
     btnStop && btnStop.addEventListener('click', function(){
-      MQTTClient.publishJSON(_prefix + '/api', { pattern: 'stop' });
+      MQTTClient.publish(_prefix + '/set/pattern/stop', '');
       log('→ Pattern stopped');
     });
 
@@ -475,6 +536,7 @@ window.RelayModule = (function () {
       _subscribe();
       _initPatternUI();
       MQTTClient.publish(_prefix + '/ping', '1');
+      MQTTClient.publish(_prefix + '/get', 'all');
       log('[Relays] init → ' + prefix);
     },
     onConnected:    function(){},

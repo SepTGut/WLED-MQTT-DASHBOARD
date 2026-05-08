@@ -21,36 +21,75 @@ window.SensorModule = (function () {
 
   var _subFull   = null;
   var _subSensor = null;
+  var _subDetail = null;
 
   var log = function (m, lvl) { window.AppLog && AppLog[lvl || 'info'](m); };
+
+  function _onSensorDetail(payloadStr, topic) {
+    var parts = topic.split('/');
+    var id    = parseInt(parts[parts.length - 2], 10);
+    if (isNaN(id)) return;
+
+    var detail;
+    try { detail = JSON.parse(payloadStr); } catch (e) { return; }
+    if (!detail || typeof detail !== 'object') return;
+
+    var active = window.AppCoreUtils && window.AppCoreUtils.sensorStateFromPayload
+      ? window.AppCoreUtils.sensorStateFromPayload(payloadStr)
+      : !!detail.state;
+    var sensor = _sensors.find(function (s) { return s.id === id; });
+    var next = {
+      id: id,
+      name: detail.name || ('Sensor ' + id),
+      gpio: detail.pin !== undefined ? detail.pin : '-',
+      active: active === null ? false : active,
+      lastChange: Date.now() - (Math.max(0, Number(detail.last_change_ms) || 0))
+    };
+
+    if (sensor) {
+      sensor.name = next.name;
+      sensor.gpio = next.gpio;
+      if (sensor.active !== next.active) sensor.lastChange = next.lastChange;
+      sensor.active = next.active;
+      _updateCard(id);
+    } else {
+      _sensors.push(next);
+      _render();
+    }
+  }
 
   /* ════════════════════════════════════════════════
      SUBSCRIBE
   ════════════════════════════════════════════════ */
 
   function _subscribe() {
-    _subFull   = MQTTClient.subscribe(_prefix + '/v',           _onFullState);
-    _subSensor = MQTTClient.subscribe(_prefix + '/sensor/+/v',  _onSensorState);
+    _subFull   = MQTTClient.subscribe(_prefix + '/v',              _onFullState);
+    _subSensor = MQTTClient.subscribe(_prefix + '/sensor/+/v',     _onSensorState);
+    _subDetail = MQTTClient.subscribe(_prefix + '/sensor/+/detail', _onSensorDetail);
     log('[Sensors] subscribed → ' + _prefix);
   }
 
   function _unsubscribe() {
     if (_subFull)   { _subFull.unsubscribe();   _subFull = null; }
     if (_subSensor) { _subSensor.unsubscribe(); _subSensor = null; }
+    if (_subDetail) { _subDetail.unsubscribe(); _subDetail = null; }
   }
 
   /* ── {prefix}/v  (we only care about sensors[]) ── */
   function _onFullState(payloadStr) {
     var json;
     try { json = JSON.parse(payloadStr); } catch (e) { return; }
-    if (!Array.isArray(json.sensors) || json.sensors.length === 0) return;
+    var sensors = window.AppCoreUtils && window.AppCoreUtils.normalizeSensorList
+      ? window.AppCoreUtils.normalizeSensorList(json)
+      : [];
+    if (!sensors.length && !Array.isArray(json.sensors) && !Array.isArray(json.s)) return;
 
-    json.sensors.forEach(function (s) {
-      var id  = s.id !== undefined ? s.id : s.index;
+    sensors.forEach(function (s) {
+      var id  = s.id;
       var existing = _sensors.find(function (x) { return x.id === id; });
       if (existing) {
         var wasActive = existing.active;
-        existing.name   = s.name  || existing.name;
+        existing.name   = (!s.name || s.name === ('Sensor ' + id)) ? existing.name : s.name;
         existing.gpio   = s.gpio  !== undefined ? s.gpio  : existing.gpio;
         existing.active = !!s.active;
         if (existing.active !== wasActive) existing.lastChange = Date.now();
@@ -150,8 +189,12 @@ window.SensorModule = (function () {
     if (!card || !sensor) return;
 
     card.classList.toggle('active', sensor.active);
+    var nameEl = card.querySelector('.sensor-name');
+    if (nameEl) nameEl.textContent = sensor.name;
     var pill = card.querySelector('.sensor-state-pill');
     if (pill) pill.lastChild.textContent = sensor.active ? 'ACTIVE' : 'IDLE';
+    var meta = card.querySelector('.sensor-meta');
+    if (meta) meta.textContent = 'GPIO ' + sensor.gpio;
     var elapsed = card.querySelector('.sensor-elapsed');
     if (elapsed) elapsed.textContent = _elapsed(sensor.lastChange);
   }
