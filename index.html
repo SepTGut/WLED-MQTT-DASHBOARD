@@ -6,11 +6,14 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>MQTT Controller</title>
+  <title>OpenRelay MQTT Controller</title>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0f1117" />
+  <meta name="theme-color" content="#070a0f" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 
   <!-- Theme variables -->
   <link rel="stylesheet" href="css/themes.css" />
@@ -21,6 +24,11 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
+  <div class="atmosphere-scanline" aria-hidden="true"></div>
+  <div class="hud-corner hud-corner--top-left" aria-hidden="true"></div>
+  <div class="hud-corner hud-corner--top-right" aria-hidden="true"></div>
+  <div class="hud-corner hud-corner--bottom-left" aria-hidden="true"></div>
+  <div class="hud-corner hud-corner--bottom-right" aria-hidden="true"></div>
 
   <!-- HEADER -->
 <header class="app-header">
@@ -35,6 +43,7 @@
     <span class="app-title">MQTT Controller</span>
   </div>
   <div class="header-right">
+    <a href="NewWithTailwind/index.html" class="chip-btn" title="Switch to Tailwind UI">New UI</a>
     <!-- Connection badge + tooltip wrapper -->
     <div style="position:relative;">
       <div id="conn-badge" class="conn-badge" data-state="disconnected" title="Click for connection details">

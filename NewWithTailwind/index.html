@@ -1,0 +1,219 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenRelay MQTT Controller - Tailwind</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#070a0f',
+            panel: '#0d1117',
+            panel2: '#131a23',
+            accent: '#f59e0b',
+            line: 'rgba(245,158,11,.2)'
+          },
+          boxShadow: {
+            glow: '0 0 0 1px rgba(245,158,11,.35), 0 8px 22px rgba(0,0,0,.38)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background:#070a0f; color:#e2e8f0; }
+    .tab-panel{display:none}.tab-panel.active{display:block}
+    .tab-btn.active,.bnav-btn.active{color:#f59e0b;background:rgba(245,158,11,.12)}
+    .theme-panel.hidden{display:none}
+    .relay-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.75rem}
+    .sensor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.75rem}
+    .section-card,.relay-card,.sensor-card{background:#0d1117;border:1px solid rgba(245,158,11,.2);border-radius:14px;padding:14px}
+    .relay-card.on{box-shadow:0 0 0 1px rgba(245,158,11,.55) inset,0 0 16px -4px rgba(245,158,11,.55)}
+    .quick-btn,.primary-btn,.secondary-btn,.danger-btn,.chip-btn,.icon-btn,.tab-btn,.bnav-btn,.field-input,.field-select{border:1px solid rgba(245,158,11,.2);border-radius:10px}
+    .quick-btn,.primary-btn,.secondary-btn,.danger-btn,.chip-btn,.icon-btn,.tab-btn,.bnav-btn{padding:.5rem .75rem}
+    .field-input,.field-select{background:#131a23;padding:.55rem .7rem;width:100%}
+    .value-badge{display:inline-block;background:rgba(245,158,11,.14);color:#f59e0b;border-radius:999px;padding:.1rem .6rem;font-size:.8rem}
+    .log-output{background:#0b1016;border-radius:10px;padding:.6rem;max-height:230px;overflow:auto;font-family:ui-monospace,monospace;font-size:.78rem}
+    .toggle-switch{position:relative;display:inline-block;width:46px;height:26px}.toggle-switch input{opacity:0;width:0;height:0}
+    .toggle-knob{position:absolute;inset:0;background:#334155;border-radius:999px}.toggle-knob:before{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:white;transition:transform .2s}
+    .toggle-switch input:checked + .toggle-knob{background:#f59e0b}.toggle-switch input:checked + .toggle-knob:before{transform:translateX(20px)}
+    .slider{width:100%}
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;background:rgba(7,10,15,.96);border-top:1px solid rgba(245,158,11,.2)}
+    .theme-swatch.active{outline:2px solid #f59e0b}
+    .scanline{position:fixed;left:0;right:0;top:-140px;height:140px;pointer-events:none;z-index:30;background:linear-gradient(to bottom,transparent,rgba(245,158,11,.18),transparent);animation:scanline 8s linear infinite}
+    .gridfx{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(245,158,11,.06) 1px, transparent 1px),linear-gradient(90deg, rgba(245,158,11,.06) 1px, transparent 1px);background-size:42px 42px;animation:gridDrift 14s linear infinite}
+    .glowfx{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at 12% 8%, rgba(245,158,11,.16), transparent 36%),radial-gradient(circle at 86% 18%, rgba(56,189,248,.14), transparent 40%),radial-gradient(circle at 45% 88%, rgba(245,158,11,.10), transparent 52%);animation:glowPulse 5s ease-in-out infinite}
+    .hudCorner{position:fixed;width:20px;height:20px;pointer-events:none;z-index:31}
+    .hudCorner:before,.hudCorner:after{content:'';position:absolute;background:#f59e0b;opacity:.24;animation:hudPulse 3s ease-in-out infinite}
+    .hudTL{top:70px;left:10px}.hudTR{top:70px;right:10px}.hudBL{bottom:12px;left:10px}.hudBR{bottom:12px;right:10px}
+    .hudTL:before,.hudTR:before,.hudBL:before,.hudBR:before{width:2px;height:12px}
+    .hudTL:after,.hudTR:after,.hudBL:after,.hudBR:after{width:12px;height:2px}
+    .hudTL:before,.hudBL:before{left:0}.hudTR:before,.hudBR:before{right:0}
+    .hudTL:after,.hudBL:after{left:0}.hudTR:after,.hudBR:after{right:0}
+    .hudTL:before,.hudTR:before{top:0}.hudBL:before,.hudBR:before{bottom:0}
+    .hudTL:after,.hudTR:after{top:0}.hudBL:after,.hudBR:after{bottom:0}
+    .tab-panel.active{animation:tabIn .5s cubic-bezier(.2,.8,.2,1)}
+    .tab-panel.active .section-card,.tab-panel.active .relay-card,.tab-panel.active .sensor-card,.tab-panel.active .quick-btn{animation:staggerIn .45s cubic-bezier(.2,.8,.2,1) both}
+    .tab-panel.active .section-card:nth-child(1),.tab-panel.active .relay-card:nth-child(1),.tab-panel.active .sensor-card:nth-child(1){animation-delay:.04s}
+    .tab-panel.active .section-card:nth-child(2),.tab-panel.active .relay-card:nth-child(2),.tab-panel.active .sensor-card:nth-child(2){animation-delay:.08s}
+    .tab-panel.active .section-card:nth-child(3),.tab-panel.active .relay-card:nth-child(3),.tab-panel.active .sensor-card:nth-child(3){animation-delay:.12s}
+    .tab-panel.active .section-card:nth-child(4),.tab-panel.active .relay-card:nth-child(4),.tab-panel.active .sensor-card:nth-child(4){animation-delay:.16s}
+    .section-card,.relay-card,.sensor-card{position:relative;overflow:hidden;transition:transform .22s ease,box-shadow .22s ease,border-color .2s ease}
+    .section-card:after,.relay-card:after,.sensor-card:after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,transparent 0%,rgba(245,158,11,.12) 48%,transparent 62%);transform:translateX(-120%);transition:transform .7s ease;pointer-events:none}
+    .section-card:hover:after,.relay-card:hover:after,.sensor-card:hover:after{transform:translateX(120%)}
+    .section-card:hover,.relay-card:hover,.sensor-card:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(245,158,11,.35),0 10px 24px rgba(0,0,0,.42)}
+    .quick-btn,.primary-btn,.secondary-btn,.danger-btn,.chip-btn,.icon-btn,.tab-btn,.bnav-btn{transition:transform .16s ease,box-shadow .22s ease,background .2s ease,color .2s ease,border-color .2s ease}
+    .quick-btn:hover,.primary-btn:hover,.secondary-btn:hover,.danger-btn:hover,.chip-btn:hover,.icon-btn:hover,.tab-btn:hover,.bnav-btn:hover{transform:translateY(-1px);box-shadow:var(--tw-shadow,0 0 0 1px rgba(245,158,11,.35),0 8px 22px rgba(0,0,0,.38))}
+    .quick-btn:active,.primary-btn:active,.secondary-btn:active,.danger-btn:active,.chip-btn:active,.icon-btn:active,.tab-btn:active,.bnav-btn:active{transform:scale(.97)}
+    .quick-bar{position:relative;isolation:isolate}
+    .quick-bar:after{content:'';position:absolute;inset:0;border-radius:12px;background:linear-gradient(105deg,transparent 0%,rgba(245,158,11,.11) 50%,transparent 100%);transform:translateX(-110%);animation:barSweep 4.6s ease-in-out infinite;pointer-events:none;z-index:-1}
+    #conn-badge[data-state=\"connected\"]{animation:connBreathe 2.2s ease-in-out infinite}
+    .appPulse{animation:appPulse 6s ease-in-out infinite}
+    @keyframes scanline{0%{transform:translateY(0)}100%{transform:translateY(calc(100vh + 240px))}}
+    @keyframes gridDrift{0%{transform:translate(0,0);opacity:.45}50%{transform:translate(21px,21px);opacity:.95}100%{transform:translate(0,0);opacity:.45}}
+    @keyframes glowPulse{0%,100%{opacity:.86}50%{opacity:1}}
+    @keyframes hudPulse{0%,100%{opacity:.12}50%{opacity:.3}}
+    @keyframes tabIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes staggerIn{from{opacity:0;transform:translateY(13px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+    @keyframes barSweep{0%,20%{transform:translateX(-110%)}55%{transform:translateX(110%)}100%{transform:translateX(110%)}}
+    @keyframes connBreathe{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}50%{box-shadow:0 0 0 7px rgba(245,158,11,.09)}}
+    @keyframes appPulse{0%,100%{filter:saturate(1)}50%{filter:saturate(1.08)}}
+    @media (prefers-reduced-motion: reduce){
+      .scanline,.gridfx,.glowfx,.tab-panel.active,.tab-panel.active .section-card,.tab-panel.active .relay-card,.tab-panel.active .sensor-card,.tab-panel.active .quick-btn,.quick-bar:after,#conn-badge[data-state=\"connected\"],.appPulse{animation:none!important}
+      .section-card,.relay-card,.sensor-card,.quick-btn,.primary-btn,.secondary-btn,.danger-btn,.chip-btn,.icon-btn,.tab-btn,.bnav-btn{transition:none!important}
+    }
+  </style>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body class="min-h-screen pb-20 appPulse">
+  <div class="gridfx"></div>
+  <div class="glowfx"></div>
+  <div class="scanline"></div>
+  <div class="hudCorner hudTL" aria-hidden="true"></div>
+  <div class="hudCorner hudTR" aria-hidden="true"></div>
+  <div class="hudCorner hudBL" aria-hidden="true"></div>
+  <div class="hudCorner hudBR" aria-hidden="true"></div>
+  <header class="sticky top-0 z-40 border-b border-amber-500/20 bg-bg/90 backdrop-blur px-4 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg border border-line grid place-items-center text-accent">⚡</div>
+      <div>
+        <p class="font-semibold tracking-wide">OpenRelay MQTT</p>
+        <p class="text-xs text-slate-400">Tailwind Edition</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="../index.html" class="chip-btn text-xs">Use Old UI</a>
+      <div style="position:relative;">
+        <div id="conn-badge" class="conn-badge quick-btn text-xs" data-state="disconnected" title="Click for connection details"><span class="conn-dot"></span><span class="conn-label">Offline</span></div>
+        <div id="conn-tooltip" class="conn-tooltip section-card absolute right-0 mt-2 hidden min-w-44 p-2 text-xs"><div class="tooltip-row flex justify-between gap-4"><span>Broker</span><span id="tooltip-broker">-</span></div><div class="tooltip-row flex justify-between gap-4"><span>Connected</span><span id="tooltip-uptime">-</span></div></div>
+      </div>
+      <button class="icon-btn" id="theme-btn" title="Change theme">Theme</button>
+    </div>
+  </header>
+
+  <div id="theme-panel" class="theme-panel hidden fixed inset-0 z-50">
+    <div id="theme-backdrop" class="absolute inset-0 bg-black/50"></div>
+    <div class="absolute left-1/2 -translate-x-1/2 top-20 w-[92%] max-w-xl section-card">
+      <p class="mb-3 font-semibold">Choose Theme</p>
+      <div class="theme-grid grid grid-cols-3 md:grid-cols-6 gap-2">
+        <button class="theme-swatch p-2 rounded bg-slate-800" data-theme="dark">Dark</button>
+        <button class="theme-swatch p-2 rounded bg-slate-100 text-black" data-theme="light">Light</button>
+        <button class="theme-swatch p-2 rounded bg-purple-700" data-theme="purple">Purple</button>
+        <button class="theme-swatch p-2 rounded bg-cyan-700" data-theme="ocean">Ocean</button>
+        <button class="theme-swatch p-2 rounded bg-amber-600" data-theme="amber">Amber</button>
+        <button class="theme-swatch p-2 rounded bg-rose-700" data-theme="rose">Rose</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 py-4 grid md:grid-cols-[220px_1fr] gap-4">
+    <nav class="tab-bar hidden md:flex flex-col gap-2" role="tablist">
+      <button class="tab-btn active text-left" data-tab="relays" role="tab" aria-selected="true" aria-controls="tab-relays">Relays</button>
+      <button class="tab-btn text-left" data-tab="wled" role="tab" aria-selected="false" aria-controls="tab-wled">WLED</button>
+      <button class="tab-btn text-left" data-tab="sensors" role="tab" aria-selected="false" aria-controls="tab-sensors">Sensors</button>
+      <button class="tab-btn text-left" data-tab="settings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
+    </nav>
+
+    <div class="tab-content">
+      <section id="tab-relays" class="tab-panel active" role="tabpanel">
+        <div class="quick-bar flex flex-wrap gap-2 mb-3">
+          <button class="quick-btn" id="btn-alloff" disabled>All OFF</button>
+          <button class="quick-btn" id="btn-allon" disabled>All ON</button>
+          <button class="quick-btn" id="btn-ping" disabled>Ping</button>
+          <button class="quick-btn" id="btn-show-pattern" disabled>Pattern</button>
+        </div>
+        <div class="grid xl:grid-cols-[1fr_330px] gap-3">
+          <div id="relay-grid" class="relay-grid">
+            <div class="empty-state section-card" id="relay-empty"><p>Connect to broker to see relays</p></div>
+          </div>
+          <div class="section-card" id="pattern-section" style="display:none">
+            <div class="section-header flex items-center justify-between mb-2"><span class="section-title">Pattern Sequencer</span><button class="chip-btn chip-danger" id="btn-pattern-stop">Stop</button></div>
+            <div id="pattern-steps" class="pattern-steps space-y-2"></div>
+            <button class="secondary-btn" id="btn-add-step">+ Add Step</button>
+            <div class="pattern-footer mt-3 flex items-end gap-2">
+              <label class="field-label text-sm">Repeat
+                <select id="pattern-repeat" class="field-select mt-1">
+                  <option value="0">Once</option><option value="-1" selected>Infinite</option><option value="3">3x</option><option value="5">5x</option><option value="10">10x</option>
+                </select>
+              </label>
+              <button class="primary-btn" id="btn-pattern-run" disabled>Run</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-wled" class="tab-panel" role="tabpanel">
+        <div class="empty-state section-card" id="wled-empty"><p>Connect to broker to control WLED</p></div>
+        <div id="wled-panel" style="display:none" class="grid lg:grid-cols-2 gap-3">
+          <div class="section-card lg:col-span-2"><div class="wled-power-row flex items-center justify-between"><span class="section-title">Power</span><div class="flex items-center gap-2"><button class="chip-btn" id="btn-wled-refresh" title="Refresh WLED state">↻</button><label class="toggle-switch"><input type="checkbox" id="wled-power" /><span class="toggle-knob"></span></label><span id="wled-temp" class="value-badge">--°C</span></div></div></div>
+          <div class="section-card"><div class="section-header flex justify-between mb-2"><span class="section-title">Brightness</span><span id="bri-value" class="value-badge">128</span></div><input type="range" id="wled-bri" class="slider" min="0" max="255" value="128" /></div>
+          <div class="section-card"><div class="section-header flex justify-between mb-2"><span class="section-title">Color</span><span id="color-hex" class="value-badge mono">#FF6600</span></div><div class="color-row flex items-center gap-3 flex-wrap"><input type="color" id="wled-color" class="color-picker w-11 h-11" value="#FF6600" /><div class="color-presets flex flex-wrap gap-2" id="color-presets"><button class="color-dot w-6 h-6 rounded-full" style="background:#FF0000" data-color="#FF0000"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#FF6600" data-color="#FF6600"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#FFFF00" data-color="#FFFF00"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#00FF00" data-color="#00FF00"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#00FFFF" data-color="#00FFFF"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#0000FF" data-color="#0000FF"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#FF00FF" data-color="#FF00FF"></button><button class="color-dot w-6 h-6 rounded-full" style="background:#FFFFFF" data-color="#FFFFFF"></button></div></div></div>
+          <div class="section-card"><div class="section-header flex justify-between mb-2"><span class="section-title">Speed</span><span id="spd-value" class="value-badge">128</span></div><input type="range" id="wled-spd" class="slider" min="0" max="255" value="128" /><div class="section-header flex justify-between mt-4 mb-2"><span class="section-title">Intensity</span><span id="int-value" class="value-badge">128</span></div><input type="range" id="wled-int" class="slider" min="0" max="255" value="128" /></div>
+          <div class="section-card"><div class="section-header mb-2"><span class="section-title">Effects & Presets</span></div><div class="field-group space-y-2"><label class="field-label text-sm">Effect<select id="wled-fx" class="field-select mt-1"><option value="-1">(none)</option><option value="0">Solid</option><option value="1">Blink</option><option value="2">Breathe</option><option value="3">Wipe</option><option value="4">Wipe Random</option><option value="5">Random Colors</option><option value="6">Sweep</option><option value="7">Dynamic</option><option value="8">Colorloop</option><option value="9">Rainbow</option><option value="10">Scan</option><option value="11">Dual Scan</option><option value="12">Fade</option><option value="13">Theater</option><option value="14">Theater Rainbow</option><option value="15">Running</option><option value="16">Saw</option><option value="17">Twinkle</option><option value="18">Dissolve</option><option value="19">Dissolve Rnd</option><option value="20">Sparkle</option><option value="21">Dark Sparkle</option><option value="22">Sparkle+</option><option value="23">Strobe</option><option value="24">Strobe Rainbow</option><option value="25">Mega Strobe</option><option value="26">Blink Rainbow</option><option value="27">Android</option><option value="28">Chase</option><option value="29">Chase Random</option><option value="30">Chase Rainbow</option><option value="31">Chase Flash</option><option value="32">Chase Flash Rnd</option><option value="33">Rainbow Runner</option><option value="34">Colorful</option><option value="35">Traffic Light</option><option value="36">Sweep Random</option><option value="37">Running 2</option><option value="38">Aurora</option><option value="39">Stream</option><option value="40">Scanner</option><option value="41">Lighthouse</option><option value="42">Fireworks</option><option value="43">Rain</option><option value="44">Tetrix</option><option value="45">Fire Flicker</option><option value="46">Gradient</option><option value="47">Loading</option><option value="48">Rolling Balls</option><option value="49">Fairy</option><option value="50">Two Dots</option><option value="51">Fairytwirl</option><option value="52">Running Dual</option></select></label><div class="row flex items-end gap-2"><label class="field-label text-sm flex-1">Preset #<input type="number" id="wled-preset" class="field-input mt-1" value="1" min="1" max="250" step="1" /></label><button class="primary-btn" id="btn-wled-loadpreset">Load Preset</button></div></div></div>
+        </div>
+      </section>
+
+      <section id="tab-sensors" class="tab-panel" role="tabpanel">
+        <div class="empty-state section-card" id="sensors-empty"><p>No sensors reported yet</p></div>
+        <div id="sensor-grid" class="sensor-grid"></div>
+      </section>
+
+      <section id="tab-settings" class="tab-panel" role="tabpanel">
+        <div class="grid lg:grid-cols-2 gap-3">
+          <div class="section-card"><p class="section-title mb-2">Broker</p><div class="field-group space-y-2"><label class="field-label text-sm">Host <input type="text" id="cfg-host" class="field-input mt-1" placeholder="broker.hivemq.com" value="broker.hivemq.com" /></label><div class="field-row grid grid-cols-2 gap-2 items-end"><label class="field-label text-sm">Port <input type="number" id="cfg-port" class="field-input mt-1" placeholder="8884" value="8884" min="1" max="65535" /></label><label class="tls-toggle text-sm"><input type="checkbox" id="cfg-tls" checked /> <span>WSS / TLS</span></label></div><label class="field-label text-sm">Username <input type="text" id="cfg-user" class="field-input mt-1" placeholder="leave blank if none" /></label><label class="field-label text-sm">Password <input type="password" id="cfg-pass" class="field-input mt-1" placeholder="leave blank if none" /></label><label class="tls-toggle text-sm"><input type="checkbox" id="cfg-remember-pass" /> <span>Remember Password (local only)</span></label></div></div>
+          <div class="section-card"><p class="section-title mb-2">Topics</p><div class="field-group space-y-2"><label class="field-label text-sm">Relay Controller Prefix <input type="text" id="cfg-relay-prefix" class="field-input mt-1" placeholder="home/relay" value="home/relay" /><span class="field-hint text-xs text-slate-400">Default: <code>home/relay</code></span></label><label class="field-label text-sm">WLED Device Topic <input type="text" id="cfg-wled-prefix" class="field-input mt-1" placeholder="wled/my_wled" value="wled/my_wled" /><span class="field-hint text-xs text-slate-400">Match your WLED MQTT device topic</span></label></div></div>
+          <div class="settings-actions lg:col-span-2 flex flex-wrap gap-2"><button class="primary-btn" id="btn-connect">Connect</button><button class="danger-btn" id="btn-disconnect" disabled>Disconnect</button><a href="../index.html" class="secondary-btn">Switch to Old UI</a></div>
+          <div class="section-card lg:col-span-2"><div class="section-header flex justify-between mb-2"><span class="section-title">Activity Log</span><button class="chip-btn" id="btn-clear-log">Clear</button></div><div id="log-output" class="log-output" role="log" aria-live="polite"></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <nav class="bottom-nav md:hidden p-2" aria-label="Main navigation">
+    <div class="grid grid-cols-4 gap-2">
+      <button class="bnav-btn active" data-tab="relays" aria-label="Relays">Relays</button>
+      <button class="bnav-btn" data-tab="wled" aria-label="WLED">WLED</button>
+      <button class="bnav-btn" data-tab="sensors" aria-label="Sensors">Sensors</button>
+      <button class="bnav-btn" data-tab="settings" aria-label="Settings">Settings</button>
+    </div>
+  </nav>
+
+  <script src="../js/core-utils.js"></script>
+  <script src="../js/mqtt.js"></script>
+  <script src="../js/relays.js"></script>
+  <script src="../js/wled.js"></script>
+  <script src="../js/sensors.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    document.addEventListener('click', function(e){
+      const tip = document.getElementById('conn-tooltip');
+      if (!tip) return;
+      if (e.target.closest('#conn-badge')) tip.classList.toggle('hidden');
+      else if (!e.target.closest('#conn-tooltip')) tip.classList.add('hidden');
+    });
+  </script>
+</body>
+</html>

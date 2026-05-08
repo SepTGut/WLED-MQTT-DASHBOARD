@@ -24,45 +24,45 @@
 
 /* ── 1. DARK (default) ──────────────────────────────── */
 [data-theme="dark"] {
-  --color-bg:          #0f1117;
-  --color-surface:     #1a1d27;
-  --color-surface-2:   #22263a;
-  --color-border:      #2e3347;
-  --color-text:        #e8eaf6;
-  --color-text-muted:  #7b82a8;
-  --color-accent:      #6c8aff;
-  --color-accent-dim:  rgba(108,138,255,.15);
-  --color-success:     #3dd68c;
-  --color-danger:      #f06a6a;
-  --color-relay-on:    #3dd68c;
-  --color-relay-off:   #3a3f58;
-  --color-sensor-on:   #38d4d4;
+  --color-bg:          #070a0f;
+  --color-surface:     #0d1117;
+  --color-surface-2:   #131a23;
+  --color-border:      rgba(245, 158, 11, 0.2);
+  --color-text:        #e2e8f0;
+  --color-text-muted:  #7e8ba1;
+  --color-accent:      #f59e0b;
+  --color-accent-dim:  rgba(245, 158, 11, .16);
+  --color-success:     #22c55e;
+  --color-danger:      #ef4444;
+  --color-relay-on:    #f59e0b;
+  --color-relay-off:   #334155;
+  --color-sensor-on:   #38bdf8;
 
   /* Header */
-  --header-bg:         #141720;
-  --header-border:     #23273b;
+  --header-bg:         rgba(7, 10, 15, .88);
+  --header-border:     rgba(245, 158, 11, .18);
 
   /* Bottom nav */
-  --bnav-bg:           #141720;
-  --bnav-border:       #23273b;
+  --bnav-bg:           rgba(7, 10, 15, .94);
+  --bnav-border:       rgba(245, 158, 11, .18);
   --bnav-active:       var(--color-accent);
 
   /* Toggle */
-  --toggle-track-off:  #2e3347;
+  --toggle-track-off:  #334155;
   --toggle-track-on:   var(--color-accent);
   --toggle-knob:       #ffffff;
 
   /* Slider */
-  --slider-track:      #2e3347;
+  --slider-track:      #334155;
   --slider-thumb:      var(--color-accent);
 
   /* Log */
-  --log-bg:            #0d1018;
-  --log-text:          #8892c8;
-  --log-info:          #6c8aff;
-  --log-success:       #3dd68c;
-  --log-warning:       #f5c842;
-  --log-error:         #f06a6a;
+  --log-bg:            #0b1016;
+  --log-text:          #94a3b8;
+  --log-info:          #fbbf24;
+  --log-success:       #22c55e;
+  --log-warning:       #f59e0b;
+  --log-error:         #ef4444;
 }
 
 /* ── 2. LIGHT ────────────────────────────────────────── */
