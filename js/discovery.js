@@ -151,19 +151,16 @@ window.DiscoveryModule = (function () {
 
     useDevice: function (topic, type) {
       if (type === 'wled') {
-        const el = document.getElementById('cfg-wled-prefix');
-        if (el) {
-            el.value = topic;
-            el.dispatchEvent(new Event('change'));
-            log(`[Discovery] Set WLED topic to: ${topic}`, 'success');
-            // Switch to WLED tab
-            const tabBtn = document.querySelector('.tab-btn[data-tab="wled"]');
-            if (tabBtn) tabBtn.click();
-            // Re-init WLED if connected
-            if (MQTTClient.connected) {
-                window.WLEDModule && window.WLEDModule.init(topic);
-            }
+        const list = window.getWLEDList();
+        if (!list.includes(topic)) {
+            list.push(topic);
+            window.saveWLEDList(list);
+            if (MQTTClient.connected) window.WLEDModule.init(topic);
+            log(`[Discovery] Added WLED device: ${topic}`, 'success');
         }
+        // Switch to WLED tab
+        const tabBtn = document.querySelector('.tab-btn[data-tab="wled"]');
+        if (tabBtn) tabBtn.click();
       } else {
         const el = document.getElementById('cfg-relay-prefix');
         if (el) {

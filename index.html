@@ -187,83 +187,98 @@
 
       <!-- WLED TAB -->
       <section id="tab-wled" class="tab-panel" role="tabpanel">
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-title">Add WLED Device</span>
+          </div>
+          <div class="field-row">
+            <input type="text" id="add-wled-prefix" class="field-input" placeholder="wled/my_device" />
+            <button class="primary-btn" id="btn-add-wled">Add</button>
+          </div>
+        </div>
+
         <div class="empty-state" id="wled-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <p>Connect to broker to control WLED</p>
+          <p>No WLED devices added yet.</p>
         </div>
-        <div id="wled-panel" style="display:none">
-          <!-- Power + Refresh + Temperature -->
-          <div class="section-card">
-            <div class="wled-power-row">
-              <span class="section-title">Power</span>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <button class="chip-btn" id="btn-wled-refresh" title="Refresh WLED state">↻</button>
-                <label class="toggle-switch" aria-label="WLED power">
-                  <input type="checkbox" id="wled-power" />
-                  <span class="toggle-knob"></span>
-                </label>
-                <span id="wled-temp" class="value-badge" style="margin-left:auto; min-width:48px;">--°C</span>
-              </div>
-            </div>
-          </div>
-          <!-- Brightness -->
-          <div class="section-card">
-            <div class="section-header">
-              <span class="section-title">Brightness</span>
-              <span id="bri-value" class="value-badge">128</span>
-            </div>
-            <input type="range" id="wled-bri" class="slider" min="0" max="255" value="128" />
-          </div>
-          <!-- Color -->
-          <div class="section-card">
-            <div class="section-header">
-              <span class="section-title">Color</span>
-              <span id="color-hex" class="value-badge mono">#FF6600</span>
-            </div>
-            <div class="color-row">
-              <input type="color" id="wled-color" class="color-picker" value="#FF6600" />
-              <div class="color-presets" id="color-presets">
-                <button class="color-dot" style="background:#FF0000" data-color="#FF0000" title="Red" aria-label="Red"></button>
-                <button class="color-dot" style="background:#FF6600" data-color="#FF6600" title="Orange" aria-label="Orange"></button>
-                <button class="color-dot" style="background:#FFFF00" data-color="#FFFF00" title="Yellow" aria-label="Yellow"></button>
-                <button class="color-dot" style="background:#00FF00" data-color="#00FF00" title="Green" aria-label="Green"></button>
-                <button class="color-dot" style="background:#00FFFF" data-color="#00FFFF" title="Cyan" aria-label="Cyan"></button>
-                <button class="color-dot" style="background:#0000FF" data-color="#0000FF" title="Blue" aria-label="Blue"></button>
-                <button class="color-dot" style="background:#FF00FF" data-color="#FF00FF" title="Magenta" aria-label="Magenta"></button>
-                <button class="color-dot" style="background:#FFFFFF" data-color="#FFFFFF" title="White" aria-label="White"></button>
-              </div>
-            </div>
-          </div>
-          <!-- Speed & Intensity -->
-          <div class="section-card">
-            <div class="section-header"><span class="section-title">Speed</span><span id="spd-value" class="value-badge">128</span></div>
-            <input type="range" id="wled-spd" class="slider" min="0" max="255" value="128" />
-            <div class="section-header" style="margin-top:16px"><span class="section-title">Intensity</span><span id="int-value" class="value-badge">128</span></div>
-            <input type="range" id="wled-int" class="slider" min="0" max="255" value="128" />
-          </div>
-          <!-- Effects & Presets -->
-          <div class="section-card">
-            <div class="section-header">
-              <span class="section-title">Effects & Presets</span>
-            </div>
-            <div class="field-group">
-              <label class="field-label">
-                Effect
-                <select id="wled-fx" class="field-select">
-                  <option value="-1">Loading effects...</option>
-                </select>
-              </label>
-              <div class="row" style="align-items:flex-end">
-                <label class="field-label" style="flex:1">
-                  Preset #
-                  <input type="number" id="wled-preset" class="field-input" value="1" min="1" max="250" step="1" />
-                </label>
-                <button class="primary-btn" id="btn-wled-loadpreset">Load Preset</button>
-              </div>
-            </div>
-          </div>
+        
+        <div id="wled-container" class="device-list-vertical">
+          <!-- WLED Device Cards injected here -->
         </div>
       </section>
+
+      <!-- TEMPLATES -->
+      <template id="tmpl-wled-panel">
+        <div class="section-card wled-device-card">
+          <div class="section-header">
+            <span class="device-name section-title">WLED</span>
+            <div style="display:flex; gap:8px;">
+               <button class="chip-btn btn-wled-refresh" id="btn-wled-refresh">↻</button>
+               <button class="chip-btn chip-danger btn-wled-remove">Remove</button>
+            </div>
+          </div>
+
+          <div class="wled-control-grid">
+            <!-- Power & Temp -->
+            <div class="control-group">
+                <div class="wled-power-row">
+                    <span class="field-label">Power</span>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="wled-power" />
+                            <span class="toggle-knob"></span>
+                        </label>
+                        <span id="wled-temp" class="value-badge">--°C</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Brightness -->
+            <div class="control-group">
+                <div class="section-header">
+                    <span class="field-label">Brightness</span>
+                    <span id="bri-value" class="value-badge">128</span>
+                </div>
+                <input type="range" id="wled-bri" class="slider" min="0" max="255" />
+            </div>
+
+            <!-- Color -->
+            <div class="control-group">
+                <div class="section-header">
+                    <span class="field-label">Color</span>
+                    <span id="color-hex" class="value-badge mono">#FF6600</span>
+                </div>
+                <div class="color-row">
+                    <input type="color" id="wled-color" class="color-picker" />
+                    <div class="color-presets">
+                        <button class="color-dot" style="background:#FF0000" data-color="#FF0000"></button>
+                        <button class="color-dot" style="background:#00FF00" data-color="#00FF00"></button>
+                        <button class="color-dot" style="background:#0000FF" data-color="#0000FF"></button>
+                        <button class="color-dot" style="background:#FFFFFF" data-color="#FFFFFF"></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speed & Intensity -->
+            <div class="control-group">
+                <div class="section-header"><span class="field-label">Speed</span><span id="spd-value" class="value-badge">128</span></div>
+                <input type="range" id="wled-spd" class="slider" min="0" max="255" />
+                <div class="section-header" style="margin-top:8px"><span class="field-label">Intensity</span><span id="int-value" class="value-badge">128</span></div>
+                <input type="range" id="wled-int" class="slider" min="0" max="255" />
+            </div>
+
+            <!-- Effects -->
+            <div class="control-group">
+                <label class="field-label">Effect</label>
+                <select id="wled-fx" class="field-select"></select>
+                <div class="row" style="margin-top:8px">
+                    <input type="number" id="wled-preset" class="field-input" value="1" min="1" max="250" style="flex:1" />
+                    <button class="primary-btn" id="btn-wled-loadpreset">Preset</button>
+                </div>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <!-- SENSORS TAB -->
       <section id="tab-sensors" class="tab-panel" role="tabpanel">

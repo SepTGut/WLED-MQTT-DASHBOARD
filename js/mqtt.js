@@ -33,7 +33,12 @@ window.MQTTClient = (function () {
   }
 
   function _uniqueClientId() {
-    return 'mqttctrl_' + Math.random().toString(36).slice(2, 10);
+    let id = localStorage.getItem('mqttctrl_client_id');
+    if (!id) {
+      id = 'mqttctrl_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('mqttctrl_client_id', id);
+    }
+    return id;
   }
 
   function _topicMatches(pattern, topic) {
@@ -135,7 +140,7 @@ window.MQTTClient = (function () {
 
     const relayPrefix = _getRelayPrefix();
     if (relayPrefix) {
-      pub(`${relayPrefix}/presence`, 'online', false);
+      pub(`${relayPrefix}/presence`, 'online', true); // Retained
       setTimeout(() => pub(`${relayPrefix}/ping`, '1', false), 300);
     }
 
@@ -205,7 +210,7 @@ window.MQTTClient = (function () {
     const opts = {
       clientId: _uniqueClientId(),
       keepalive: 30,
-      clean: true,
+      clean: false,                // Persistent session
       reconnectPeriod: 0,          // manual reconnect
       username: cfg.username || undefined,
       password: cfg.password || undefined,

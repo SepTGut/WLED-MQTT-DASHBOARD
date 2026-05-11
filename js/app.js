@@ -163,6 +163,35 @@ window.AppLog = (function () {
     });
   });
 
+  /* WLED Multi-device list persistence */
+  const WLED_LIST_KEY = 'mqttctrl_wled_list';
+  window.getWLEDList = () => JSON.parse(localStorage.getItem(WLED_LIST_KEY) || '[]');
+  window.saveWLEDList = (list) => localStorage.setItem(WLED_LIST_KEY, JSON.stringify(list));
+
+  const btnAddWLED = document.getElementById('btn-add-wled');
+  const inputAddWLED = document.getElementById('add-wled-prefix');
+  if (btnAddWLED && inputAddWLED) {
+      btnAddWLED.addEventListener('click', () => {
+          const prefix = inputAddWLED.value.trim();
+          if (!prefix) return;
+          const list = window.getWLEDList();
+          if (!list.includes(prefix)) {
+              list.push(prefix);
+              window.saveWLEDList(list);
+              if (MQTTClient.connected) WLEDModule.init(prefix);
+          }
+          inputAddWLED.value = '';
+      });
+  }
+
+  // Hook into WLEDModule.removeDevice to update our list
+  const origRemove = WLEDModule.removeDevice;
+  WLEDModule.removeDevice = function(prefix) {
+      origRemove.call(WLEDModule, prefix);
+      const list = window.getWLEDList().filter(p => p !== prefix);
+      window.saveWLEDList(list);
+  };
+
   var btnReset = document.getElementById('btn-reset-settings');
   if (btnReset) {
     btnReset.addEventListener('click', function() {
@@ -357,8 +386,14 @@ window.AppLog = (function () {
 
   /* WLEDModule */
   wrap(window.WLEDModule, 'onConnected', function () {
-    var p = (document.getElementById('cfg-wled-prefix').value || 'wled/my_wled').trim();
-    WLEDModule.init(p);
+    const list = window.getWLEDList();
+    // Default prefix if list is empty
+    if (list.length === 0) {
+        const defaultPrefix = (document.getElementById('cfg-wled-prefix').value || 'wled/my_wled').trim();
+        list.push(defaultPrefix);
+        window.saveWLEDList(list);
+    }
+    list.forEach(p => WLEDModule.init(p));
   });
 
   /* SensorModule */
