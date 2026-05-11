@@ -25,26 +25,26 @@
 /* ── 1. DARK (default) ──────────────────────────────── */
 [data-theme="dark"] {
   --color-bg:          #070a0f;
-  --color-surface:     #0d1117;
-  --color-surface-2:   #131a23;
-  --color-border:      rgba(245, 158, 11, 0.2);
+  --color-surface:     rgba(13, 17, 23, 0.7);
+  --color-surface-2:   rgba(19, 26, 35, 0.8);
+  --color-border:      rgba(245, 158, 11, 0.25);
   --color-text:        #e2e8f0;
   --color-text-muted:  #7e8ba1;
   --color-accent:      #f59e0b;
   --color-accent-dim:  rgba(245, 158, 11, .16);
-  --color-success:     #22c55e;
+  --color-success:     #10b981;
   --color-danger:      #ef4444;
   --color-relay-on:    #f59e0b;
   --color-relay-off:   #334155;
   --color-sensor-on:   #38bdf8;
 
   /* Header */
-  --header-bg:         rgba(7, 10, 15, .88);
-  --header-border:     rgba(245, 158, 11, .18);
+  --header-bg:         rgba(7, 10, 15, .85);
+  --header-border:     rgba(245, 158, 11, .2);
 
   /* Bottom nav */
-  --bnav-bg:           rgba(7, 10, 15, .94);
-  --bnav-border:       rgba(245, 158, 11, .18);
+  --bnav-bg:           rgba(7, 10, 15, .9);
+  --bnav-border:       rgba(245, 158, 11, .2);
   --bnav-active:       var(--color-accent);
 
   /* Toggle */
@@ -57,12 +57,19 @@
   --slider-thumb:      var(--color-accent);
 
   /* Log */
-  --log-bg:            #0b1016;
+  --log-bg:            rgba(11, 16, 22, 0.9);
   --log-text:          #94a3b8;
   --log-info:          #fbbf24;
   --log-success:       #22c55e;
   --log-warning:       #f59e0b;
   --log-error:         #ef4444;
+
+  /* Shadows & Glows */
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.6);
+  --glow-accent: 0 0 15px var(--color-accent-dim), 0 0 30px rgba(245, 158, 11, 0.05);
+  --glass-blur: blur(12px);
 }
 
 /* ── 2. LIGHT ────────────────────────────────────────── */

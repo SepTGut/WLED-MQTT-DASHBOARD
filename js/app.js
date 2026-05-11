@@ -201,6 +201,21 @@ window.AppLog = (function () {
       var el = document.getElementById(id);
       if (el) el.disabled = !connected;
     });
+
+    /* Connection info update */
+    if (state === 'connected') {
+      connStart = Date.now();
+      tooltipBroker.textContent = (document.getElementById('cfg-host').value || 'broker') + ':' + (document.getElementById('cfg-port').value || '8884');
+      updateUptime();
+      if (uptimeInterval) clearInterval(uptimeInterval);
+      uptimeInterval = setInterval(updateUptime, 1000);
+    } else {
+      connStart = null;
+      if (uptimeInterval) { clearInterval(uptimeInterval); uptimeInterval = null; }
+      tooltipUptime.textContent = '—';
+      tooltipBroker.textContent = '—';
+      tooltip.classList.remove('visible');
+    }
   }
   window.setConnectionState = setState;   /* MQTTClient calls this */
 
@@ -229,25 +244,6 @@ window.AppLog = (function () {
       tooltip.classList.remove('visible');
     }
   });
-
-  // Update badge tooltip on connection state change
-  var origSetState = setState;
-  setState = function(state, meta) {
-    origSetState(state, meta);
-    if (state === 'connected') {
-      connStart = Date.now();
-      tooltipBroker.textContent = (document.getElementById('cfg-host').value || 'broker') + ':' + (document.getElementById('cfg-port').value || '8884');
-      updateUptime();
-      if (uptimeInterval) clearInterval(uptimeInterval);
-      uptimeInterval = setInterval(updateUptime, 1000);
-    } else {
-      connStart = null;
-      if (uptimeInterval) { clearInterval(uptimeInterval); uptimeInterval = null; }
-      tooltipUptime.textContent = '—';
-      tooltipBroker.textContent = '—';
-      tooltip.classList.remove('visible');
-    }
-  };
 
 
   /* ── Connect button ────────────────────────────── */

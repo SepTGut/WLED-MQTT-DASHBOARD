@@ -9,6 +9,17 @@
   <title>OpenRelay MQTT Controller</title>
 
   <!-- PWA Manifest -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>WLED & Relay Control</title>
+
+  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#070a0f" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -23,7 +34,8 @@
   <!-- ⚠️ Replaced: mqtt.js instead of Paho -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
-<body>
+<body data-theme="dark">
+  <canvas id="particle-canvas"></canvas>
   <div class="atmosphere-scanline" aria-hidden="true"></div>
   <div class="hud-corner hud-corner--top-left" aria-hidden="true"></div>
   <div class="hud-corner hud-corner--top-right" aria-hidden="true"></div>
@@ -382,10 +394,11 @@
 
   <!-- JavaScript -->
   <script src="js/core-utils.js"></script>
-  <!-- ⚠️ Use new mqtt.js (mqtt.js client) -->
+  <!-- App Scripts -->
   <script src="js/mqtt.js"></script>
   <script src="js/relays.js"></script>
   <script src="js/wled.js"></script>
+  <script src="js/visuals.js"></script>
   <script src="js/sensors.js"></script>
   <script src="js/app.js"></script>
 
