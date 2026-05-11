@@ -11,6 +11,7 @@ class Visuals {
         this.mouse = { x: null, y: null, radius: 180 };
         this.accentColor = '#f59e0b';
         this.lastTheme = '';
+        this.performanceMode = false;
 
         this.init();
         this.animate();
@@ -61,6 +62,7 @@ class Visuals {
     }
 
     applyEffects(e) {
+        if (this.performanceMode) return;
         // 1. 3D Tilt & Glare for Cards
         const cards = document.querySelectorAll('.relay-card, .sensor-card, .section-card');
         cards.forEach(card => {
@@ -118,6 +120,10 @@ class Visuals {
     }
 
     animate() {
+        if (this.performanceMode) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            return;
+        }
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         const accent = this.accentColor;
@@ -150,6 +156,20 @@ class Visuals {
             }
         }
         this.ctx.globalAlpha = 1;
+    }
+
+    setPerformanceMode(on) {
+        this.performanceMode = !!on;
+        if (!this.performanceMode) {
+            this.animate();
+        } else {
+            // Reset all card/button transforms
+            document.querySelectorAll('.relay-card, .sensor-card, .section-card, .quick-btn, .tab-btn, .primary-btn, .icon-btn, .chip-btn, .conn-badge')
+                .forEach(el => {
+                    el.style.transform = '';
+                    el.style.boxShadow = '';
+                });
+        }
     }
 }
 

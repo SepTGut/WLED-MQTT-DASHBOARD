@@ -35,7 +35,7 @@ window.AppLog = (function () {
     var safe = String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     line.innerHTML = '<span class="log-ts">' + ts() + '</span><span class="log-msg">' + safe + '</span>';
     el.appendChild(line);
-    while (el.children.length > 300) el.removeChild(el.firstChild);
+    while (el.children.length > 200) el.removeChild(el.firstChild);
     el.scrollTop = el.scrollHeight;
   }
 
@@ -117,7 +117,7 @@ window.AppLog = (function () {
 (function initSettings() {
   var KEY    = 'mqttctrl_settings';
   var VERSION = 2;
-  var fields = ['cfg-host','cfg-port','cfg-tls','cfg-user','cfg-relay-prefix','cfg-wled-prefix','cfg-remember-pass'];
+  var fields = ['cfg-host','cfg-port','cfg-tls','cfg-user','cfg-relay-prefix','cfg-wled-prefix','cfg-remember-pass', 'cfg-perf-mode'];
 
   /* Restore */
   try {
@@ -150,7 +150,14 @@ window.AppLog = (function () {
         var passEl = document.getElementById('cfg-pass');
         var rememberEl = document.getElementById('cfg-remember-pass');
         if (passEl && rememberEl && rememberEl.checked) data['cfg-pass'] = passEl.value;
-        if (rememberEl && !rememberEl.checked) delete data['cfg-pass'];
+        if (id === 'cfg-relay-prefix' || id === 'cfg-wled-prefix') {
+            if (window.MQTTClient && !MQTTClient.isValidTopic(el.value, true)) {
+                AppLog.error('Warning: Invalid MQTT topic pattern: ' + el.value);
+                el.classList.add('field-error');
+            } else {
+                el.classList.remove('field-error');
+            }
+        }
         localStorage.setItem(KEY, JSON.stringify(data));
       } catch (e) { /* ignore */ }
     });
@@ -164,6 +171,19 @@ window.AppLog = (function () {
         location.reload();
       }
     });
+  }
+  
+  /* Performance mode logic */
+  var perfEl = document.getElementById('cfg-perf-mode');
+  if (perfEl) {
+      function applyPerf() {
+          if (window.visuals) {
+              window.visuals.setPerformanceMode(perfEl.checked);
+          }
+      }
+      perfEl.addEventListener('change', applyPerf);
+      // Wait a bit for Visuals to init
+      setTimeout(applyPerf, 200);
   }
 })();
 
@@ -346,6 +366,24 @@ window.AppLog = (function () {
     var p = (document.getElementById('cfg-relay-prefix').value || 'home/relay').trim();
     SensorModule.init(p);
   });
+
+  /* DiscoveryModule */
+  wrap(window.DiscoveryModule, 'onConnected', function () {
+    DiscoveryModule.init();
+  });
+  
+  // Also init discovery immediately if already defined
+  if (window.DiscoveryModule && window.DiscoveryModule.init) {
+      DiscoveryModule.init();
+  }
+
+  // Scan button
+  var btnScan = document.getElementById('btn-discovery-scan');
+  if (btnScan) {
+      btnScan.addEventListener('click', function() {
+          if (window.DiscoveryModule) DiscoveryModule.startScan();
+      });
+  }
 
 })();
 

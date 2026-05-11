@@ -277,6 +277,18 @@
       <!-- SETTINGS TAB -->
       <section id="tab-settings" class="tab-panel" role="tabpanel">
         <div class="section-card">
+          <p class="section-title">UI / UX</p>
+          <div class="field-group">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="field-label" style="margin:0">Performance Mode <span class="muted">(Disable heavy effects)</span></span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-perf-mode" />
+                <span class="toggle-knob"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="section-card">
           <p class="section-title">Broker</p>
           <div class="field-group">
             <label class="field-label">Host <input type="text" id="cfg-host" class="field-input" placeholder="broker.hivemq.com" value="broker.hivemq.com" /></label>
@@ -294,6 +306,16 @@
           <div class="field-group">
             <label class="field-label">Relay Controller Prefix <input type="text" id="cfg-relay-prefix" class="field-input" placeholder="home/relay" value="home/relay" /><span class="field-hint">Default: <code>home/relay</code></span></label>
             <label class="field-label">WLED Device Topic <input type="text" id="cfg-wled-prefix" class="field-input" placeholder="wled/my_wled" value="wled/my_wled" /><span class="field-hint">Match your WLED MQTT device topic</span></label>
+          </div>
+        </div>
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-title">Device Discovery</span>
+            <button class="chip-btn" id="btn-discovery-scan">Scan Traffic</button>
+          </div>
+          <p class="muted" style="font-size:0.8rem; margin-bottom:12px;">Discovers WLED and Home Assistant compatible devices automatically.</p>
+          <div id="discovery-list" class="discovery-list">
+            <!-- Discovery cards injected here -->
           </div>
         </div>
         <div class="settings-actions">
@@ -336,6 +358,7 @@
   <script src="js/relays.js"></script>
   <script src="js/wled.js"></script>
   <script src="js/visuals.js"></script>
+  <script src="js/discovery.js"></script>
   <script src="js/sensors.js"></script>
   <script src="js/app.js"></script>
 

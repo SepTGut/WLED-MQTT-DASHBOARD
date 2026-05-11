@@ -329,6 +329,7 @@ img, svg { display: block; max-width: 100%; }
 .field-input:focus, .field-select:focus {
   border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent-dim);
 }
+.field-error { border-color: var(--color-danger) !important; box-shadow: 0 0 0 2px rgba(239,68,68,0.2) !important; }
 .field-row { display: flex; gap: 12px; align-items: flex-end; }
 .field-hint { font-size: 0.7rem; opacity: 0.5; margin-top: 2px; }
 .row { display: flex; gap: 12px; }
@@ -431,3 +432,17 @@ img, svg { display: block; max-width: 100%; }
   0%, 100% { box-shadow: none; }
   50% { box-shadow: 0 0 20px var(--color-danger); }
 }
+/* ── Discovery Module ────────────────────────── */
+.discovery-list { display: flex; flex-direction: column; gap: 8px; }
+.discovery-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--color-surface-2); border: 1px solid var(--color-border);
+  transition: var(--transition);
+}
+.discovery-card:hover { border-color: var(--color-accent-dim); background: var(--color-surface); }
+.discovery-info { flex: 1; min-width: 0; }
+.discovery-name { font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+.discovery-type { font-size: 0.65rem; padding: 1px 6px; border-radius: 4px; background: var(--color-accent-dim); color: var(--color-accent); text-transform: uppercase; }
+.discovery-topic { font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.discovery-meta { font-size: 0.65rem; color: var(--color-text-muted); opacity: 0.7; }

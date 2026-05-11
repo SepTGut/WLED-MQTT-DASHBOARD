@@ -21,8 +21,11 @@ window.MQTTClient = (function () {
   const _maxRetries = 20;
 
   const _subs = {};           // pattern → [ { fn, subId } ]
+  const _activeSubscriptions = new Set(); // patterns actually subscribed on broker
   const _lastPayload = {};    // topic → { str, ts }
   const _queue = [];          // { topic, payload, retained, qos }
+  let _connectTimeoutTimer = null;
+  const _connectTimeoutMs = 10000; // 10s watchdog
 
   function _log(msg, level = 'info') {
     window.AppLog && window.AppLog[level] && window.AppLog[level](msg);
@@ -37,7 +40,26 @@ window.MQTTClient = (function () {
     if (window.AppCoreUtils && window.AppCoreUtils.mqttTopicMatches) {
       return window.AppCoreUtils.mqttTopicMatches(pattern, topic);
     }
-    return pattern === topic;
+    // Basic fallback if core-utils not loaded
+    if (pattern === topic) return true;
+    if (pattern === '#') return true;
+    return false;
+  }
+
+  function _isValidTopic(topic, allowWildcards = false) {
+    if (!topic || typeof topic !== 'string') return false;
+    if (topic.length > 255) return false;
+    
+    // Check for invalid characters
+    if (/[+#]/.test(topic) && !allowWildcards) return false;
+    
+    // Basic MQTT topic rules
+    const parts = topic.split('/');
+    for (let i = 0; i < parts.length; i++) {
+        if (parts[i].includes('+') && parts[i].length > 1) return false;
+        if (parts[i].includes('#') && (parts[i].length > 1 || i !== parts.length - 1)) return false;
+    }
+    return true;
   }
 
   function _nextReconnectMs() {
@@ -81,10 +103,19 @@ window.MQTTClient = (function () {
   }
 
   function _resubscribeAll() {
+    _activeSubscriptions.clear();
     Object.keys(_subs).forEach(pattern => {
+      if (!_isValidTopic(pattern, true)) {
+        _log(`Skipping invalid subscription pattern: ${pattern}`, 'error');
+        return;
+      }
       _client.subscribe(pattern, { qos: 0 }, (err) => {
-        if (err) _log(`Subscribe error: ${pattern} — ${err}`, 'error');
-        else _log(`↩ Re-subscribed: ${pattern}`);
+        if (err) {
+          _log(`Subscribe error: ${pattern} — ${err}`, 'error');
+        } else {
+          _activeSubscriptions.add(pattern);
+          _log(`↩ Re-subscribed: ${pattern}`);
+        }
       });
     });
   }
@@ -97,6 +128,7 @@ window.MQTTClient = (function () {
     window.setConnectionState && window.setConnectionState('connected');
 
     if (_reconnTimer) { clearTimeout(_reconnTimer); _reconnTimer = null; }
+    if (_connectTimeoutTimer) { clearTimeout(_connectTimeoutTimer); _connectTimeoutTimer = null; }
 
     _resubscribeAll();
     _processQueue();
@@ -115,8 +147,10 @@ window.MQTTClient = (function () {
   function _onClose() {
     if (!_connected) return;
     _connected = false;
+    _activeSubscriptions.clear();
     _log('Disconnected', 'error');
     window.setConnectionState && window.setConnectionState('error');
+    if (_connectTimeoutTimer) { clearTimeout(_connectTimeoutTimer); _connectTimeoutTimer = null; }
 
     window.RelayModule && window.RelayModule.onDisconnected && window.RelayModule.onDisconnected();
     window.WLEDModule  && window.WLEDModule.onDisconnected  && window.WLEDModule.onDisconnected();
@@ -148,6 +182,7 @@ window.MQTTClient = (function () {
     else if (msg.includes('Identifier rejected')) msg = 'Connection Refused: Client ID rejected';
     else if (msg.includes('Server unavailable')) msg = 'Connection Refused: Server unavailable';
     _log(`MQTT error: ${msg}`, 'error');
+    if (_connectTimeoutTimer) { clearTimeout(_connectTimeoutTimer); _connectTimeoutTimer = null; }
   }
 
   /* ══════ CONNECT ══════ */
@@ -160,6 +195,10 @@ window.MQTTClient = (function () {
     const useSSL   = !!cfg.useTLS;
     const protocol = useSSL ? 'wss' : 'ws';
     const url = `${protocol}://${cfg.host}:${cfg.port}/mqtt`;
+
+    if (!_isValidTopic('test')) { // Just checking if our validator works
+        // ...
+    }
 
     _log(`Connecting to ${url}`);
 
@@ -195,6 +234,15 @@ window.MQTTClient = (function () {
     _client.on('close', _onClose);
     _client.on('message', _onMessage);
     _client.on('error', _onError);
+
+    // Watchdog for connection hanging
+    if (_connectTimeoutTimer) clearTimeout(_connectTimeoutTimer);
+    _connectTimeoutTimer = setTimeout(() => {
+        if (!_connected) {
+            _log('Connection attempt timed out.', 'error');
+            _onClose(); // Trigger retry logic
+        }
+    }, _connectTimeoutMs);
   }
 
   function pub(topic, payload, retained = false, qos = 0) {
@@ -205,6 +253,10 @@ window.MQTTClient = (function () {
       } else {
         _log(`Offline: queue full, dropped ${topic}`, 'error');
       }
+      return false;
+    }
+    if (!_isValidTopic(topic)) {
+      _log(`Invalid publish topic: ${topic}`, 'error');
       return false;
     }
     _client.publish(topic, String(payload), { qos, retain: retained }, (err) => {
@@ -268,9 +320,15 @@ window.MQTTClient = (function () {
       const entry = { fn: callback, subId: Math.random().toString(36).slice(2, 8) };
       _subs[topic].push(entry);
 
-      if (_client && _connected) {
+      if (!_isValidTopic(topic, true)) {
+        _log(`Invalid subscription topic: ${topic}`, 'error');
+        return { unsubscribe: () => {} };
+      }
+
+      if (_client && _connected && !_activeSubscriptions.has(topic)) {
         _client.subscribe(topic, { qos: 0 }, (err) => {
           if (err) _log(`Subscribe error: ${topic} — ${err}`, 'error');
+          else _activeSubscriptions.add(topic);
         });
       }
 
@@ -297,6 +355,10 @@ window.MQTTClient = (function () {
 
     publishJSON(topic, obj, retained = false) {
       return pub(topic, JSON.stringify(obj), retained);
+    },
+
+    isValidTopic(topic, allowWildcards = false) {
+      return _isValidTopic(topic, allowWildcards);
     }
   };
 

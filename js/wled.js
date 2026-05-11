@@ -38,7 +38,10 @@ window.WLEDModule = (function () {
     "Dissolve Rnd", "Sparkle", "Dark Sparkle", "Sparkle+", "Strobe", "Strobe Rainbow", "Mega Strobe", "Blink Rainbow",
     "Android", "Chase", "Chase Random", "Chase Rainbow", "Chase Flash", "Chase Flash Rnd", "Rainbow Runner", "Colorful",
     "Traffic Light", "Sweep Random", "Running 2", "Aurora", "Stream", "Scanner", "Lighthouse", "Fireworks", "Rain",
-    "Tetrix", "Fire Flicker", "Gradient", "Loading", "Rolling Balls", "Fairy", "Two Dots", "Fairytwirl", "Running Dual"
+    "Tetrix", "Fire Flicker", "Gradient", "Loading", "Rolling Balls", "Fairy", "Two Dots", "Fairytwirl", "Running Dual",
+    "Halloween", "Tricolor Chase", "Tricolor Wipe", "Tricolor Fade", "Lightning", "ICU", "Multi Comet", "Dual Scanner", "Stream 2",
+    "Oscillate", "Pride 2015", "Juggle", "Palette", "Fire 2012", "Colorwaves", "BPM", "Fill Noise", "Noise 1", "Noise 2",
+    "Noise 3", "Noise 4", "Colortwinkles", "Lake", "Meteor", "Meteor Smooth", "Railway", "Ripple"
   ];
 
   var _briTimer  = null;
@@ -47,6 +50,33 @@ window.WLEDModule = (function () {
   var _online    = false;
 
   var log = function(m, lvl) { window.AppLog && AppLog[lvl || 'info'](m); };
+
+  function _saveState() {
+    try {
+      var data = {
+        bri: _bri,
+        color: _color,
+        speed: _speed,
+        intens: _intens,
+        fx: _fx
+      };
+      localStorage.setItem('wled_ui_state_' + _prefix, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  function _loadState() {
+    try {
+      var saved = localStorage.getItem('wled_ui_state_' + _prefix);
+      if (saved) {
+        var data = JSON.parse(saved);
+        if (data.bri !== undefined) _bri = data.bri;
+        if (data.color !== undefined) _color = data.color;
+        if (data.speed !== undefined) _speed = data.speed;
+        if (data.intens !== undefined) _intens = data.intens;
+        if (data.fx !== undefined) _fx = data.fx;
+      }
+    } catch (e) {}
+  }
 
   /* ════════════════════════════════════════════════
      MQTT SUBSCRIPTIONS
@@ -111,6 +141,7 @@ window.WLEDModule = (function () {
       } else if (typeof json.col === 'string') {
         _color = json.col.startsWith('#') ? json.col : '#' + json.col;
         _updateColorUI();
+        _saveState();
       }
 
       if (Array.isArray(json.seg) && json.seg[0]) {
@@ -118,6 +149,7 @@ window.WLEDModule = (function () {
         if (seg.sx !== undefined) { _speed  = Number(seg.sx); _updateSpdUI(); }
         if (seg.ix !== undefined) { _intens = Number(seg.ix); _updateIntUI(); }
         if (seg.fx !== undefined) { _fx     = Number(seg.fx); _updateFxUI(); }
+        _saveState();
       }
 
         if (json.temp !== undefined && !isNaN(Number(json.temp))) {
@@ -142,7 +174,7 @@ window.WLEDModule = (function () {
 
       // Brightness
       var ac = parseInt(tag('ac'), 10);
-      if (!isNaN(ac)) { _bri = Math.max(0, Math.min(255, ac)); _updateBriUI(); }
+      if (!isNaN(ac)) { _bri = Math.max(0, Math.min(255, ac)); _updateBriUI(); _saveState(); }
 
       // Color (multiple <cl> elements)
       var clValues = [];
@@ -156,20 +188,21 @@ window.WLEDModule = (function () {
         if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
           _color = _rgbToHex(r, g, b);
           _updateColorUI();
+          _saveState();
         }
       }
 
       // Speed
       var sx = parseInt(tag('sx'), 10);
-      if (!isNaN(sx)) { _speed = Math.max(0, Math.min(255, sx)); _updateSpdUI(); }
+      if (!isNaN(sx)) { _speed = Math.max(0, Math.min(255, sx)); _updateSpdUI(); _saveState(); }
 
       // Intensity
       var ix = parseInt(tag('ix'), 10);
-      if (!isNaN(ix)) { _intens = Math.max(0, Math.min(255, ix)); _updateIntUI(); }
+      if (!isNaN(ix)) { _intens = Math.max(0, Math.min(255, ix)); _updateIntUI(); _saveState(); }
 
       // Effect
       var fx = parseInt(tag('fx'), 10);
-      if (!isNaN(fx) && fx >= 0) { _fx = fx; _updateFxUI(); }
+      if (!isNaN(fx) && fx >= 0) { _fx = fx; _updateFxUI(); _saveState(); }
     }
   }
 
@@ -191,6 +224,7 @@ window.WLEDModule = (function () {
     if (isNaN(v)) return;
     _bri = Math.max(0, Math.min(255, v));
     _updateBriUI();
+    _saveState();
   }
 
   /* ── color hex ──────────────────────────────────── */
@@ -199,6 +233,7 @@ window.WLEDModule = (function () {
     if (!raw) return;
     _color = raw.startsWith('#') ? raw : '#' + raw;
     _updateColorUI();
+    _saveState();
   }
 
   /* ── Request device full state ──────────────────── */
@@ -224,6 +259,7 @@ window.WLEDModule = (function () {
     MQTTClient.publish(_prefix + '/g', String(_bri));
     MQTTClient.publishJSON(_prefix + '/api', { bri: _bri });
     log('→ WLED brightness ' + _bri);
+    _saveState();
   }
 
   function _sendColor(hex) {
@@ -235,18 +271,21 @@ window.WLEDModule = (function () {
     MQTTClient.publishJSON(_prefix + '/api', { col: [[rgb.r, rgb.g, rgb.b]] });
     log('→ WLED color ' + hex);
     _updateColorUI();
+    _saveState();
   }
 
   function _sendSpeed(val) {
     _speed = Math.max(0, Math.min(255, parseInt(val, 10)));
     MQTTClient.publishJSON(_prefix + '/api', { seg: [{ id: 0, sx: _speed }] });
     log('→ WLED speed ' + _speed);
+    _saveState();
   }
 
   function _sendIntensity(val) {
     _intens = Math.max(0, Math.min(255, parseInt(val, 10)));
     MQTTClient.publishJSON(_prefix + '/api', { seg: [{ id: 0, ix: _intens }] });
     log('→ WLED intensity ' + _intens);
+    _saveState();
   }
 
   function _sendEffect(fx) {
@@ -256,6 +295,7 @@ window.WLEDModule = (function () {
     MQTTClient.publishJSON(_prefix + '/api', { fx: fx });
     log('→ WLED effect ' + fx);
     _updateFxUI();
+    _saveState();
   }
 
   function _sendPreset(num) {
@@ -436,6 +476,7 @@ window.WLEDModule = (function () {
   return {
     init: function(prefix) {
       _prefix = prefix;
+      _loadState();
       _populateEffects();
       _wireEvents();
       _subscribe();
