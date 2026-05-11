@@ -20,8 +20,8 @@
   <!-- All component & layout styles -->
   <link rel="stylesheet" href="css/app.css" />
 
-  <!-- ⚠️ Replaced: mqtt.js instead of Paho -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <!-- Local library: mqtt.js instead of Paho -->
+  <script src="lib/mqtt.min.js"></script>
 </head>
 <body data-theme="dark">
   <canvas id="particle-canvas"></canvas>
@@ -250,60 +250,7 @@
               <label class="field-label">
                 Effect
                 <select id="wled-fx" class="field-select">
-                  <option value="-1">(none)</option>
-                  <option value="0">Solid</option>
-                  <option value="1">Blink</option>
-                  <option value="2">Breathe</option>
-                  <option value="3">Wipe</option>
-                  <option value="4">Wipe Random</option>
-                  <option value="5">Random Colors</option>
-                  <option value="6">Sweep</option>
-                  <option value="7">Dynamic</option>
-                  <option value="8">Colorloop</option>
-                  <option value="9">Rainbow</option>
-                  <option value="10">Scan</option>
-                  <option value="11">Dual Scan</option>
-                  <option value="12">Fade</option>
-                  <option value="13">Theater</option>
-                  <option value="14">Theater Rainbow</option>
-                  <option value="15">Running</option>
-                  <option value="16">Saw</option>
-                  <option value="17">Twinkle</option>
-                  <option value="18">Dissolve</option>
-                  <option value="19">Dissolve Rnd</option>
-                  <option value="20">Sparkle</option>
-                  <option value="21">Dark Sparkle</option>
-                  <option value="22">Sparkle+</option>
-                  <option value="23">Strobe</option>
-                  <option value="24">Strobe Rainbow</option>
-                  <option value="25">Mega Strobe</option>
-                  <option value="26">Blink Rainbow</option>
-                  <option value="27">Android</option>
-                  <option value="28">Chase</option>
-                  <option value="29">Chase Random</option>
-                  <option value="30">Chase Rainbow</option>
-                  <option value="31">Chase Flash</option>
-                  <option value="32">Chase Flash Rnd</option>
-                  <option value="33">Rainbow Runner</option>
-                  <option value="34">Colorful</option>
-                  <option value="35">Traffic Light</option>
-                  <option value="36">Sweep Random</option>
-                  <option value="37">Running 2</option>
-                  <option value="38">Aurora</option>
-                  <option value="39">Stream</option>
-                  <option value="40">Scanner</option>
-                  <option value="41">Lighthouse</option>
-                  <option value="42">Fireworks</option>
-                  <option value="43">Rain</option>
-                  <option value="44">Tetrix</option>
-                  <option value="45">Fire Flicker</option>
-                  <option value="46">Gradient</option>
-                  <option value="47">Loading</option>
-                  <option value="48">Rolling Balls</option>
-                  <option value="49">Fairy</option>
-                  <option value="50">Two Dots</option>
-                  <option value="51">Fairytwirl</option>
-                  <option value="52">Running Dual</option>
+                  <option value="-1">Loading effects...</option>
                 </select>
               </label>
               <div class="row" style="align-items:flex-end">
@@ -352,6 +299,7 @@
         <div class="settings-actions">
           <button class="primary-btn full-width" id="btn-connect">Connect</button>
           <button class="danger-btn full-width" id="btn-disconnect" disabled>Disconnect</button>
+          <button class="secondary-btn full-width" id="btn-reset-settings" style="margin-top: 8px;">Reset All Settings</button>
         </div>
         <div class="section-card">
           <div class="section-header"><span class="section-title">Activity Log</span><button class="chip-btn" id="btn-clear-log">Clear</button></div>

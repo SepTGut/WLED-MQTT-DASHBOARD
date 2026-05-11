@@ -156,16 +156,13 @@ window.AppLog = (function () {
     });
   });
 
-  var passEl = document.getElementById('cfg-pass');
-  if (passEl) {
-    passEl.addEventListener('change', function () {
-      try {
-        var data = JSON.parse(localStorage.getItem(KEY) || '{}');
-        data.__v = VERSION;
-        var rememberEl = document.getElementById('cfg-remember-pass');
-        if (rememberEl && rememberEl.checked) data['cfg-pass'] = passEl.value;
-        localStorage.setItem(KEY, JSON.stringify(data));
-      } catch (e) { /* ignore */ }
+  var btnReset = document.getElementById('btn-reset-settings');
+  if (btnReset) {
+    btnReset.addEventListener('click', function() {
+      if (confirm('Are you sure you want to clear all settings and saved passwords?')) {
+        localStorage.removeItem(KEY);
+        location.reload();
+      }
     });
   }
 })();

@@ -18,10 +18,11 @@ window.MQTTClient = (function () {
   let _cfg         = null;
   let _reconnTimer = null;
   let _retryAttempt = 0;
-  const _maxRetries = Infinity;
+  const _maxRetries = 20;
 
   const _subs = {};           // pattern → [ { fn, subId } ]
-  const _lastPayload = {};
+  const _lastPayload = {};    // topic → { str, ts }
+  const _queue = [];          // { topic, payload, retained, qos }
 
   function _log(msg, level = 'info') {
     window.AppLog && window.AppLog[level] && window.AppLog[level](msg);
@@ -98,6 +99,7 @@ window.MQTTClient = (function () {
     if (_reconnTimer) { clearTimeout(_reconnTimer); _reconnTimer = null; }
 
     _resubscribeAll();
+    _processQueue();
 
     const relayPrefix = _getRelayPrefix();
     if (relayPrefix) {
@@ -128,13 +130,24 @@ window.MQTTClient = (function () {
 
   function _onMessage(topic, payload) {
     const payloadStr = payload.toString();
-    if (_lastPayload[topic] === payloadStr) return;
-    _lastPayload[topic] = payloadStr;
+    const now = Date.now();
+    
+    // Throttling: Ignore identical payloads ONLY if they arrive within 100ms
+    // This prevents tight loops but allows heartbeats/repeated status updates.
+    if (_lastPayload[topic] && _lastPayload[topic].str === payloadStr) {
+      if (now - _lastPayload[topic].ts < 100) return;
+    }
+    
+    _lastPayload[topic] = { str: payloadStr, ts: now };
     _dispatch(topic, payloadStr);
   }
 
   function _onError(err) {
-    _log(`MQTT error: ${err.message || err}`, 'error');
+    let msg = err.message || err;
+    if (msg.includes('Not authorized')) msg = 'Connection Refused: Not authorized (check username/password)';
+    else if (msg.includes('Identifier rejected')) msg = 'Connection Refused: Client ID rejected';
+    else if (msg.includes('Server unavailable')) msg = 'Connection Refused: Server unavailable';
+    _log(`MQTT error: ${msg}`, 'error');
   }
 
   /* ══════ CONNECT ══════ */
@@ -165,8 +178,8 @@ window.MQTTClient = (function () {
       opts.will = {
         topic: `${relayPrefix}/presence`,
         payload: 'offline',
-        qos: 0,
-        retain: false
+        qos: 1,
+        retain: true
       };
     }
 
@@ -184,15 +197,29 @@ window.MQTTClient = (function () {
     _client.on('error', _onError);
   }
 
-  function pub(topic, payload, retained = false) {
+  function pub(topic, payload, retained = false, qos = 0) {
     if (!_client || !_connected) {
-      _log(`Publish skipped (not connected): ${topic}`, 'warning');
+      if (_queue.length < 50) {
+        _queue.push({ topic, payload, retained, qos });
+        _log(`Offline: queued ${topic}`, 'warning');
+      } else {
+        _log(`Offline: queue full, dropped ${topic}`, 'error');
+      }
       return false;
     }
-    _client.publish(topic, String(payload), { qos: 0, retain: retained }, (err) => {
+    _client.publish(topic, String(payload), { qos, retain: retained }, (err) => {
       if (err) _log(`Publish error on ${topic}: ${err}`, 'error');
     });
     return true;
+  }
+
+  function _processQueue() {
+    if (!_queue.length) return;
+    _log(`Processing ${_queue.length} queued messages...`, 'info');
+    while (_queue.length > 0) {
+      const msg = _queue.shift();
+      pub(msg.topic, msg.payload, msg.retained, msg.qos);
+    }
   }
 
   function _getRelayPrefix() {
@@ -232,7 +259,8 @@ window.MQTTClient = (function () {
       const str = (typeof payload === 'object')
         ? JSON.stringify(payload)
         : String(payload);
-      return pub(topic, str, retained);
+      // Default to QoS 1 for most user actions for better reliability
+      return pub(topic, str, retained, 1);
     },
 
     subscribe(topic, callback) {

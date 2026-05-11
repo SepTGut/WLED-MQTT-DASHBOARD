@@ -31,6 +31,15 @@ window.WLEDModule = (function () {
   var _intens  = 128;
   var _fx      = -1;        // current effect ID, -1 = none
   var _mcuTemp = null;      // latest MCU temperature
+  
+  var _effects = [
+    "(none)", "Solid", "Blink", "Breathe", "Wipe", "Wipe Random", "Random Colors", "Sweep", "Dynamic", "Colorloop",
+    "Rainbow", "Scan", "Dual Scan", "Fade", "Theater", "Theater Rainbow", "Running", "Saw", "Twinkle", "Dissolve",
+    "Dissolve Rnd", "Sparkle", "Dark Sparkle", "Sparkle+", "Strobe", "Strobe Rainbow", "Mega Strobe", "Blink Rainbow",
+    "Android", "Chase", "Chase Random", "Chase Rainbow", "Chase Flash", "Chase Flash Rnd", "Rainbow Runner", "Colorful",
+    "Traffic Light", "Sweep Random", "Running 2", "Aurora", "Stream", "Scanner", "Lighthouse", "Fireworks", "Rain",
+    "Tetrix", "Fire Flicker", "Gradient", "Loading", "Rolling Balls", "Fairy", "Two Dots", "Fairytwirl", "Running Dual"
+  ];
 
   var _briTimer  = null;
   var _spdTimer  = null;
@@ -111,10 +120,16 @@ window.WLEDModule = (function () {
         if (seg.fx !== undefined) { _fx     = Number(seg.fx); _updateFxUI(); }
       }
 
-      if (json.temp !== undefined && !isNaN(Number(json.temp))) {
-        _updateTempUI(Number(json.temp));
-      }
-      return;
+        if (json.temp !== undefined && !isNaN(Number(json.temp))) {
+          _updateTempUI(Number(json.temp));
+        }
+
+        // Optional: Update effect list if present in full state
+        if (Array.isArray(json.effects)) {
+          _effects = ["(none)"].concat(json.effects);
+          _populateEffects();
+        }
+        return;
     }
 
     // XML path (custom KamarATS/SetGT device)
@@ -295,6 +310,20 @@ window.WLEDModule = (function () {
     if (sel) sel.value = _fx;
   }
 
+  function _populateEffects() {
+    var sel = document.getElementById('wled-fx');
+    if (!sel) return;
+    var current = sel.value;
+    sel.innerHTML = "";
+    _effects.forEach(function(name, i) {
+      var opt = document.createElement('option');
+      opt.value = i - 1;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    sel.value = current;
+  }
+
   function _showPanel(visible) {
     var panel = document.getElementById('wled-panel');
     var empty = document.getElementById('wled-empty');
@@ -407,6 +436,7 @@ window.WLEDModule = (function () {
   return {
     init: function(prefix) {
       _prefix = prefix;
+      _populateEffects();
       _wireEvents();
       _subscribe();
       _showPanel(true);
