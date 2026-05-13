@@ -497,7 +497,6 @@ window.RelayModule = (function () {
       });
 
       row.querySelector('.pattern-step-remove').addEventListener('click', function () {
-      row.querySelector('.pattern-step-remove').addEventListener('click', function(){
         _patternSteps.splice(i, 1);
         _renderPatternSteps();
       });
@@ -513,40 +512,40 @@ window.RelayModule = (function () {
   ════════════════════════════════════════════════ */
 
   function _onDisconnected() {
-    Object.keys(_timers).forEach(function(k){ clearInterval(_timers[k]); });
-    _timers  = {};
-    _relays  = [];
-    _pendingState = {};
-    var empty = document.getElementById('relay-empty');
-    var grid  = document.getElementById('relay-grid');
-    if (empty) { empty.querySelector('p').textContent = 'Connect to broker to see relays'; empty.style.display = ''; }
-    if (grid)  { Array.from(grid.children).forEach(function(c){ if (c.id !== 'relay-empty') c.remove(); }); }
-  }
+        Object.keys(_timers).forEach(function (k) { clearInterval(_timers[k]); });
+        _timers = {};
+        _relays = [];
+        _pendingState = {};
+        var empty = document.getElementById('relay-empty');
+        var grid = document.getElementById('relay-grid');
+        if (empty) { empty.querySelector('p').textContent = 'Connect to broker to see relays'; empty.style.display = ''; }
+        if (grid) { Array.from(grid.children).forEach(function (c) { if (c.id !== 'relay-empty') c.remove(); }); }
+      }
 
   function _esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
 
   /* ════════════════════════════════════════════════
      PUBLIC API
   ════════════════════════════════════════════════ */
   return {
-    init: function(prefix) {
-      if (_prefix !== prefix) {
-        _unsubscribe();
-        _prefix = prefix;
-        _subscribe();
-      } else if (!_subFull) {
-        _subscribe();
-      }
-      _initPatternUI();
-      MQTTClient.publish(_prefix + '/ping', '1');
-      MQTTClient.publish(_prefix + '/get', 'all');
-      log('[Relays] init → ' + prefix);
-    },
-    onConnected:    function(){},
-    onDisconnected: _onDisconnected,
-    get relays(){ return _relays; }
-  };
+      init: function (prefix) {
+        if (_prefix !== prefix) {
+          _unsubscribe();
+          _prefix = prefix;
+          _subscribe();
+        } else if (!_subFull) {
+          _subscribe();
+        }
+        _initPatternUI();
+        MQTTClient.publish(_prefix + '/ping', '1');
+        MQTTClient.publish(_prefix + '/get', 'all');
+        log('[Relays] init → ' + prefix);
+      },
+      onConnected: function () { },
+      onDisconnected: _onDisconnected,
+      get relays() { return _relays; }
+    };
 
-})();
+  }) ();
