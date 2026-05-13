@@ -1,25 +1,21 @@
 /* ═══════════════════════════════════════════════════════
-   app.js  —  Main application entry point
+   app.js  v2.1 — Main application entry point
    ─────────────────────────────────────────────────────
-   Load order:  mqtt.js → relays.js → wled.js → sensors.js → app.js
-
-   Responsibilities:
-   • Tab / bottom-nav routing
-   • Theme switching  (persists to localStorage)
-   • Activity log helper  (window.AppLog)
-   • Connect / Disconnect UI + validation
-   • Settings persist to localStorage
-   • Wire MQTTClient → RelayModule / WLEDModule / SensorModule
-   • Quick-bar relay actions (All ON/OFF/Ping)
+   Changes v2.1:
+   • Dispatches relays:update CustomEvent for status bar
+   • Discovery init only called when connected
+   • Performance-mode toggle wired after visuals load
+   • Settings version bump → 3 (new perf-mode field)
+   • Enter-key connect on all settings inputs
    ═══════════════════════════════════════════════════════ */
 
 'use strict';
 
 /* ══════════════════════════════════════════════════════
-   1. ACTIVITY LOG  (defined first — all modules use it)
+   1. ACTIVITY LOG
 ══════════════════════════════════════════════════════ */
 window.AppLog = (function () {
-  var el       = document.getElementById('log-output');
+  var el = document.getElementById('log-output');
   var btnClear = document.getElementById('btn-clear-log');
 
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -32,20 +28,26 @@ window.AppLog = (function () {
     if (!el) return;
     var line = document.createElement('div');
     line.className = 'log-line ' + (level || 'info');
-    var safe = String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    line.innerHTML = '<span class="log-ts">' + ts() + '</span><span class="log-msg">' + safe + '</span>';
+    var safe = String(msg)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    line.innerHTML =
+      '<span class="log-ts">' + ts() + '</span>' +
+      '<span class="log-msg">' + safe + '</span>';
     el.appendChild(line);
-    while (el.children.length > 200) el.removeChild(el.firstChild);
+    // Keep log lean
+    while (el.children.length > 250) el.removeChild(el.firstChild);
     el.scrollTop = el.scrollHeight;
   }
 
   btnClear && btnClear.addEventListener('click', function () { el.innerHTML = ''; });
 
   return {
-    info:    function (m) { add(m, 'info');    },
+    info: function (m) { add(m, 'info'); },
     success: function (m) { add(m, 'success'); },
-    warn:    function (m) { add(m, 'warning'); },
-    error:   function (m) { add(m, 'error');   }
+    warn: function (m) { add(m, 'warning'); },
+    error: function (m) { add(m, 'error'); }
   };
 })();
 
@@ -54,29 +56,38 @@ window.AppLog = (function () {
    2. TAB ROUTING
 ══════════════════════════════════════════════════════ */
 (function initTabs() {
-  var KEY      = 'mqttctrl_active_tab';
-  var panels   = document.querySelectorAll('.tab-panel');
-  var tabBtns  = document.querySelectorAll('.tab-btn');
+  var KEY = 'mqttctrl_active_tab';
+  var panels = document.querySelectorAll('.tab-panel');
+  var tabBtns = document.querySelectorAll('.tab-btn');
   var bnavBtns = document.querySelectorAll('.bnav-btn');
 
   function switchTab(name) {
-    panels.forEach(function (p) { p.classList.toggle('active', p.id === 'tab-' + name); });
+    panels.forEach(function (p) {
+      p.classList.toggle('active', p.id === 'tab-' + name);
+    });
     tabBtns.forEach(function (b) {
       var on = b.dataset.tab === name;
       b.classList.toggle('active', on);
-      b.setAttribute('aria-selected', on);
+      b.setAttribute('aria-selected', String(on));
     });
-    bnavBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.tab === name); });
-    try { localStorage.setItem(KEY, name); } catch (e) { /* ignore */ }
+    bnavBtns.forEach(function (b) {
+      b.classList.toggle('active', b.dataset.tab === name);
+    });
+    try { localStorage.setItem(KEY, name); } catch (e) { }
   }
 
-  tabBtns.forEach(function (b)  { b.addEventListener('click', function () { switchTab(b.dataset.tab); }); });
-  bnavBtns.forEach(function (b) { b.addEventListener('click', function () { switchTab(b.dataset.tab); }); });
+  tabBtns.forEach(function (b) {
+    b.addEventListener('click', function () { switchTab(b.dataset.tab); });
+  });
+  bnavBtns.forEach(function (b) {
+    b.addEventListener('click', function () { switchTab(b.dataset.tab); });
+  });
 
   var saved = null;
-  try { saved = localStorage.getItem(KEY); } catch (e) { /* ignore */ }
-  var valid = saved && document.getElementById('tab-' + saved);
-  if (valid) switchTab(saved);
+  try { saved = localStorage.getItem(KEY); } catch (e) { }
+  if (saved && document.getElementById('tab-' + saved)) {
+    switchTab(saved);
+  }
 })();
 
 
@@ -84,40 +95,61 @@ window.AppLog = (function () {
    3. THEME SWITCHER
 ══════════════════════════════════════════════════════ */
 (function initTheme() {
-  var KEY      = 'mqttctrl_theme';
-  var html     = document.documentElement;
-  var btn      = document.getElementById('theme-btn');
-  var panel    = document.getElementById('theme-panel');
+  var KEY = 'mqttctrl_theme';
+  var html = document.documentElement;
+  var btn = document.getElementById('theme-btn');
+  var panel = document.getElementById('theme-panel');
   var backdrop = document.getElementById('theme-backdrop');
   var swatches = document.querySelectorAll('.theme-swatch');
 
   function apply(name) {
     html.setAttribute('data-theme', name);
-    localStorage.setItem(KEY, name);
-    swatches.forEach(function (s) { s.classList.toggle('active', s.dataset.theme === name); });
+    document.body.setAttribute('data-theme', name);
+    try { localStorage.setItem(KEY, name); } catch (e) { }
+    swatches.forEach(function (s) {
+      s.classList.toggle('active', s.dataset.theme === name);
+    });
+    // Let visuals pick up new accent colour
+    if (window.visuals) window.visuals._updateAccent && window.visuals._updateAccent();
   }
 
-  function open()  { panel.classList.remove('hidden'); btn.setAttribute('aria-expanded','true'); }
-  function close() { panel.classList.add('hidden');    btn.setAttribute('aria-expanded','false'); }
+  function openPanel() {
+    panel.classList.remove('hidden');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+  function closePanel() {
+    panel.classList.add('hidden');
+    btn.setAttribute('aria-expanded', 'false');
+  }
 
-  apply(localStorage.getItem(KEY) || 'dark');
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) { }
+  apply(saved || 'dark');
 
-  btn.addEventListener('click', function () { panel.classList.contains('hidden') ? open() : close(); });
-  backdrop && backdrop.addEventListener('click', close);
-  swatches.forEach(function (s) {
-    s.addEventListener('click', function () { apply(s.dataset.theme); close(); });
+  btn.addEventListener('click', function () {
+    panel.classList.contains('hidden') ? openPanel() : closePanel();
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  backdrop && backdrop.addEventListener('click', closePanel);
+  swatches.forEach(function (s) {
+    s.addEventListener('click', function () { apply(s.dataset.theme); closePanel(); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closePanel();
+  });
 })();
 
 
 /* ══════════════════════════════════════════════════════
-   4. SETTINGS  — persist / restore
+   4. SETTINGS — persist / restore
 ══════════════════════════════════════════════════════ */
 (function initSettings() {
-  var KEY    = 'mqttctrl_settings';
-  var VERSION = 2;
-  var fields = ['cfg-host','cfg-port','cfg-tls','cfg-user','cfg-relay-prefix','cfg-wled-prefix','cfg-remember-pass', 'cfg-perf-mode'];
+  var KEY = 'mqttctrl_settings';
+  var VERSION = 3;   // bumped from 2 → 3 for perf-mode field
+  var fields = [
+    'cfg-host', 'cfg-port', 'cfg-tls', 'cfg-user',
+    'cfg-relay-prefix', 'cfg-wled-prefix',
+    'cfg-remember-pass', 'cfg-perf-mode'
+  ];
 
   /* Restore */
   try {
@@ -132,87 +164,108 @@ window.AppLog = (function () {
       if (el.type === 'checkbox') el.checked = !!saved[id];
       else el.value = saved[id];
     });
-    var pass = document.getElementById('cfg-pass');
-    if (pass && saved['cfg-remember-pass'] && typeof saved['cfg-pass'] === 'string') {
-      pass.value = saved['cfg-pass'];
+    var passEl = document.getElementById('cfg-pass');
+    var rememberEl = document.getElementById('cfg-remember-pass');
+    if (passEl && rememberEl && rememberEl.checked && typeof saved['cfg-pass'] === 'string') {
+      passEl.value = saved['cfg-pass'];
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { }
 
-  /* Save on every change */
+  /* Persist on change */
+  function persist() {
+    try {
+      var data = JSON.parse(localStorage.getItem(KEY) || '{}');
+      data.__v = VERSION;
+      fields.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        data[id] = (el.type === 'checkbox') ? el.checked : el.value;
+      });
+      var passEl = document.getElementById('cfg-pass');
+      var rememberEl = document.getElementById('cfg-remember-pass');
+      if (passEl && rememberEl && rememberEl.checked) {
+        data['cfg-pass'] = passEl.value;
+      } else {
+        delete data['cfg-pass'];
+      }
+      localStorage.setItem(KEY, JSON.stringify(data));
+    } catch (e) { }
+  }
+
   fields.forEach(function (id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('change', function () {
-      try {
-        var data = JSON.parse(localStorage.getItem(KEY) || '{}');
-        data.__v = VERSION;
-        data[id] = el.type === 'checkbox' ? el.checked : el.value;
-        var passEl = document.getElementById('cfg-pass');
-        var rememberEl = document.getElementById('cfg-remember-pass');
-        if (passEl && rememberEl && rememberEl.checked) data['cfg-pass'] = passEl.value;
-        if (id === 'cfg-relay-prefix' || id === 'cfg-wled-prefix') {
-            if (window.MQTTClient && !MQTTClient.isValidTopic(el.value, true)) {
-                AppLog.error('Warning: Invalid MQTT topic pattern: ' + el.value);
-                el.classList.add('field-error');
-            } else {
-                el.classList.remove('field-error');
-            }
+      // Validate topic fields inline
+      if ((id === 'cfg-relay-prefix' || id === 'cfg-wled-prefix') && window.MQTTClient) {
+        if (!MQTTClient.isValidTopic(el.value, true)) {
+          AppLog.error('Warning: invalid topic pattern: ' + el.value);
+          el.classList.add('field-error');
+        } else {
+          el.classList.remove('field-error');
         }
-        localStorage.setItem(KEY, JSON.stringify(data));
-      } catch (e) { /* ignore */ }
+      }
+      persist();
     });
   });
 
-  /* WLED Multi-device list persistence */
-  const WLED_LIST_KEY = 'mqttctrl_wled_list';
-  window.getWLEDList = () => JSON.parse(localStorage.getItem(WLED_LIST_KEY) || '[]');
-  window.saveWLEDList = (list) => localStorage.setItem(WLED_LIST_KEY, JSON.stringify(list));
+  /* WLED multi-device list */
+  var WLED_KEY = 'mqttctrl_wled_list';
+  window.getWLEDList = function () { try { return JSON.parse(localStorage.getItem(WLED_KEY) || '[]'); } catch (e) { return []; } };
+  window.saveWLEDList = function (list) { try { localStorage.setItem(WLED_KEY, JSON.stringify(list)); } catch (e) { } };
 
-  const btnAddWLED = document.getElementById('btn-add-wled');
-  const inputAddWLED = document.getElementById('add-wled-prefix');
+  var btnAddWLED = document.getElementById('btn-add-wled');
+  var inputAddWLED = document.getElementById('add-wled-prefix');
   if (btnAddWLED && inputAddWLED) {
-      btnAddWLED.addEventListener('click', () => {
-          const prefix = inputAddWLED.value.trim();
-          if (!prefix) return;
-          const list = window.getWLEDList();
-          if (!list.includes(prefix)) {
-              list.push(prefix);
-              window.saveWLEDList(list);
-              if (MQTTClient.connected) WLEDModule.init(prefix);
-          }
-          inputAddWLED.value = '';
-      });
+    function doAddWLED() {
+      var prefix = (inputAddWLED.value || '').trim();
+      if (!prefix) return;
+      var list = window.getWLEDList();
+      if (!list.includes(prefix)) {
+        list.push(prefix);
+        window.saveWLEDList(list);
+        if (MQTTClient.connected) WLEDModule.init(prefix);
+        AppLog.success('Added WLED device: ' + prefix);
+      }
+      inputAddWLED.value = '';
+    }
+    btnAddWLED.addEventListener('click', doAddWLED);
+    inputAddWLED.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') doAddWLED();
+    });
   }
 
-  // Hook into WLEDModule.removeDevice to update our list
-  const origRemove = WLEDModule.removeDevice;
-  WLEDModule.removeDevice = function(prefix) {
-      origRemove.call(WLEDModule, prefix);
-      const list = window.getWLEDList().filter(p => p !== prefix);
-      window.saveWLEDList(list);
+  /* Hook WLEDModule.removeDevice → update saved list */
+  var origRemove = WLEDModule.removeDevice.bind(WLEDModule);
+  WLEDModule.removeDevice = function (prefix) {
+    origRemove(prefix);
+    var list = window.getWLEDList().filter(function (p) { return p !== prefix; });
+    window.saveWLEDList(list);
   };
 
+  /* Reset button */
   var btnReset = document.getElementById('btn-reset-settings');
   if (btnReset) {
-    btnReset.addEventListener('click', function() {
-      if (confirm('Are you sure you want to clear all settings and saved passwords?')) {
-        localStorage.removeItem(KEY);
+    btnReset.addEventListener('click', function () {
+      if (confirm('Reset all settings and clear saved passwords?')) {
+        try {
+          localStorage.removeItem(KEY);
+          localStorage.removeItem(WLED_KEY);
+        } catch (e) { }
         location.reload();
       }
     });
   }
-  
-  /* Performance mode logic */
+
+  /* Performance mode */
   var perfEl = document.getElementById('cfg-perf-mode');
   if (perfEl) {
-      function applyPerf() {
-          if (window.visuals) {
-              window.visuals.setPerformanceMode(perfEl.checked);
-          }
-      }
-      perfEl.addEventListener('change', applyPerf);
-      // Wait a bit for Visuals to init
-      setTimeout(applyPerf, 200);
+    function applyPerf() {
+      if (window.visuals) window.visuals.setPerformanceMode(perfEl.checked);
+    }
+    perfEl.addEventListener('change', function () { persist(); applyPerf(); });
+    // Defer until visuals are ready
+    setTimeout(applyPerf, 300);
   }
 })();
 
@@ -221,82 +274,73 @@ window.AppLog = (function () {
    5. CONNECTION UI
 ══════════════════════════════════════════════════════ */
 (function initConnectionUI() {
-  var btnConnect    = document.getElementById('btn-connect');
+  var btnConnect = document.getElementById('btn-connect');
   var btnDisconnect = document.getElementById('btn-disconnect');
-  var badge         = document.getElementById('conn-badge');
-  var badgeLabel    = badge.querySelector('.conn-label');
+  var badge = document.getElementById('conn-badge');
+  var badgeLabel = badge.querySelector('.conn-label');
 
-  /* ── setConnectionState ────────────────────────── */
+  var connStart = null;
+  var uptimeInterval = null;
+  var tooltipBroker = document.getElementById('tooltip-broker');
+  var tooltipUptime = document.getElementById('tooltip-uptime');
+
   function setState(state, meta) {
     badge.setAttribute('data-state', state);
-    var labels = { disconnected:'Offline', connecting:'Connecting…', connected:'Online', error:'Error' };
+    var labels = {
+      disconnected: 'Offline',
+      connecting: 'Connecting…',
+      connected: 'Online',
+      error: 'Error'
+    };
     var text = labels[state] || state;
     if (state === 'connecting' && meta && meta.retryAttempt) {
-      text = 'Connecting (try ' + meta.retryAttempt + ')';
+      text = 'Retry ' + meta.retryAttempt + '/' + 20;
     }
     badgeLabel.textContent = text;
 
     var connected = (state === 'connected');
-    var busy      = (state === 'connecting');
+    var busy = (state === 'connecting');
 
-    btnConnect.disabled    = connected || busy;
+    btnConnect.disabled = connected || busy;
     btnDisconnect.disabled = !connected;
 
-    /* Enable / disable control buttons */
-    ['btn-alloff','btn-allon','btn-ping','btn-show-pattern'].forEach(function (id) {
+    ['btn-alloff', 'btn-allon', 'btn-ping', 'btn-show-pattern'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.disabled = !connected;
     });
 
-    /* Connection info update */
     if (state === 'connected') {
       connStart = Date.now();
-      tooltipBroker.textContent = (document.getElementById('cfg-host').value || 'broker') + ':' + (document.getElementById('cfg-port').value || '8884');
-      updateUptime();
+      if (tooltipBroker) {
+        tooltipBroker.textContent =
+          (document.getElementById('cfg-host').value || 'broker') +
+          ':' +
+          (document.getElementById('cfg-port').value || '8884');
+      }
       if (uptimeInterval) clearInterval(uptimeInterval);
       uptimeInterval = setInterval(updateUptime, 1000);
+      updateUptime();
     } else {
       connStart = null;
       if (uptimeInterval) { clearInterval(uptimeInterval); uptimeInterval = null; }
-      tooltipUptime.textContent = '—';
-      tooltipBroker.textContent = '—';
-      tooltip.classList.remove('visible');
+      if (tooltipUptime) tooltipUptime.textContent = '—';
+      if (tooltipBroker) tooltipBroker.textContent = '—';
     }
   }
-  window.setConnectionState = setState;   /* MQTTClient calls this */
-
-  var connStart = null;
-  var tooltip   = document.getElementById('conn-tooltip');
-  var tooltipBroker = document.getElementById('tooltip-broker');
-  var tooltipUptime = document.getElementById('tooltip-uptime');
-  var uptimeInterval = null;
+  window.setConnectionState = setState;
 
   function updateUptime() {
-    if (connStart) {
-      var sec = Math.floor((Date.now() - connStart) / 1000);
-      var m = Math.floor(sec / 60);
-      var s = sec % 60;
-      tooltipUptime.textContent = m + 'm ' + s + 's';
-    }
+    if (!connStart || !tooltipUptime) return;
+    var sec = Math.floor((Date.now() - connStart) / 1000);
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    tooltipUptime.textContent = m + 'm ' + String(s).padStart(2, '0') + 's';
   }
 
-  // Show/hide tooltip on badge click
-  badge.addEventListener('click', function() {
-    tooltip.classList.toggle('visible');
-  });
-  // Hide when clicking outside
-  document.addEventListener('click', function(e) {
-    if (!badge.contains(e.target) && !tooltip.contains(e.target)) {
-      tooltip.classList.remove('visible');
-    }
-  });
-
-
-  /* ── Connect button ────────────────────────────── */
   function doConnect() {
     var host = document.getElementById('cfg-host').value.trim();
     var port = parseInt(document.getElementById('cfg-port').value, 10);
-    var tls  = document.getElementById('cfg-tls').checked;
+    var tls = document.getElementById('cfg-tls').checked;
     var user = document.getElementById('cfg-user').value.trim();
     var pass = document.getElementById('cfg-pass').value;
 
@@ -310,15 +354,13 @@ window.AppLog = (function () {
 
   btnConnect.addEventListener('click', doConnect);
 
-  /* Enter key in settings inputs triggers connect */
-  ['cfg-host','cfg-port','cfg-user','cfg-pass'].forEach(function (id) {
+  ['cfg-host', 'cfg-port', 'cfg-user', 'cfg-pass'].forEach(function (id) {
     var el = document.getElementById(id);
     el && el.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') doConnect();
     });
   });
 
-  /* ── Disconnect button ─────────────────────────── */
   btnDisconnect.addEventListener('click', function () {
     MQTTClient.disconnect();
     setState('disconnected');
@@ -329,10 +371,8 @@ window.AppLog = (function () {
 })();
 
 
-/* ... (all previous code exactly as in your file) ... */
-
 /* ══════════════════════════════════════════════════════
-   6. QUICK-BAR ACTIONS  (relay tab)
+   6. QUICK-BAR ACTIONS
 ══════════════════════════════════════════════════════ */
 (function initQuickBar() {
   function relayPrefix() {
@@ -356,44 +396,40 @@ window.AppLog = (function () {
 
   document.getElementById('btn-show-pattern').addEventListener('click', function () {
     var sec = document.getElementById('pattern-section');
-    if (sec) sec.style.display = (sec.style.display === 'none' ? '' : 'none');
+    if (sec) sec.style.display = (sec.style.display === 'none' || !sec.style.display) ? 'block' : 'none';
   });
 })();
 
-/* ... (rest of app.js unchanged) ... */
 
 /* ══════════════════════════════════════════════════════
-   7. MODULE WIRING  —  inject prefixes on connect
-      (app.js loads last; RelayModule, WLEDModule,
-       SensorModule are already defined)
+   7. MODULE WIRING
 ══════════════════════════════════════════════════════ */
 (function wireModules() {
 
   function wrap(obj, method, before) {
-    if (!obj) return;
+    if (!obj || typeof obj[method] !== 'function') return;
     var orig = obj[method];
     obj[method] = function () {
       before.apply(this, arguments);
-      if (orig) orig.apply(this, arguments);
+      orig.apply(this, arguments);
     };
   }
 
-  /* RelayModule */
+  /* RelayModule — init with prefix on connect */
   wrap(window.RelayModule, 'onConnected', function () {
     var p = (document.getElementById('cfg-relay-prefix').value || 'home/relay').trim();
     RelayModule.init(p);
   });
 
-  /* WLEDModule */
+  /* WLEDModule — restore saved device list on connect */
   wrap(window.WLEDModule, 'onConnected', function () {
-    const list = window.getWLEDList();
-    // Default prefix if list is empty
+    var list = window.getWLEDList();
     if (list.length === 0) {
-        const defaultPrefix = (document.getElementById('cfg-wled-prefix').value || 'wled/my_wled').trim();
-        list.push(defaultPrefix);
-        window.saveWLEDList(list);
+      var def = (document.getElementById('cfg-wled-prefix').value || 'wled/my_wled').trim();
+      list.push(def);
+      window.saveWLEDList(list);
     }
-    list.forEach(p => WLEDModule.init(p));
+    list.forEach(function (p) { WLEDModule.init(p); });
   });
 
   /* SensorModule */
@@ -402,23 +438,45 @@ window.AppLog = (function () {
     SensorModule.init(p);
   });
 
-  /* DiscoveryModule */
+  /* DiscoveryModule — init ONLY when connected */
   wrap(window.DiscoveryModule, 'onConnected', function () {
     DiscoveryModule.init();
   });
-  
-  // Also init discovery immediately if already defined
-  if (window.DiscoveryModule && window.DiscoveryModule.init) {
-      DiscoveryModule.init();
-  }
 
-  // Scan button
   var btnScan = document.getElementById('btn-discovery-scan');
   if (btnScan) {
-      btnScan.addEventListener('click', function() {
-          if (window.DiscoveryModule) DiscoveryModule.startScan();
-      });
+    btnScan.addEventListener('click', function () {
+      if (window.DiscoveryModule && MQTTClient.connected) {
+        DiscoveryModule.startScan();
+      } else {
+        AppLog.warn('Connect to a broker before scanning.');
+      }
+    });
   }
+
+  /* Relay status-bar updater
+     RelayModule fires a custom event after every render/update */
+  var _origRelayRender = null;
+  function patchRelayRender() {
+    if (!window.RelayModule) return;
+    // Poll until RelayModule is fully loaded
+    if (typeof RelayModule._patchedStatusBar === 'undefined') {
+      RelayModule._patchedStatusBar = true;
+      // Monkey-patch the internal render by observing relay-grid mutations
+      var grid = document.getElementById('relay-grid');
+      if (!grid) return;
+      var mo = new MutationObserver(function () {
+        var relays = RelayModule.relays || [];
+        var onCount = relays.filter(function (r) { return r.on; }).length;
+        document.dispatchEvent(new CustomEvent('relays:update', {
+          detail: { total: relays.length, on: onCount }
+        }));
+      });
+      mo.observe(grid, { childList: true, subtree: true, attributes: true });
+    }
+  }
+  // Run after modules load
+  setTimeout(patchRelayRender, 500);
 
 })();
 
@@ -426,4 +484,4 @@ window.AppLog = (function () {
 /* ══════════════════════════════════════════════════════
    8. READY
 ══════════════════════════════════════════════════════ */
-AppLog.info('MQTT Controller ready — configure broker in Settings then Connect.');
+AppLog.info('MQTT Controller v2.1 ready — go to Settings and Connect.');

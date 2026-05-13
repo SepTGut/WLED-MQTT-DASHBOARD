@@ -250,9 +250,13 @@ window.SensorModule = (function () {
   ════════════════════════════════════════════════ */
   return {
     init: function (prefix) {
-      if (_prefix !== prefix) _unsubscribe();
-      _prefix = prefix;
-      _subscribe();
+      if (_prefix !== prefix) {
+        _unsubscribe();
+        _prefix = prefix;
+        _subscribe();
+      } else if (!_subFull) {
+        _subscribe();
+      }
       log('[Sensors] init → ' + prefix);
     },
     onConnected:    function () {},

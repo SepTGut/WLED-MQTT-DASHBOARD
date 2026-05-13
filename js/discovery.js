@@ -114,13 +114,17 @@ window.DiscoveryModule = (function () {
     `).join('');
   }
 
+  let _isInitialized = false;
+
   /* ════════════════════════════════════════════════
      PUBLIC API
   ════════════════════════════════════════════════ */
   return {
     init: function () {
+      if (_isInitialized) return;
       MQTTClient.subscribe('homeassistant/+/+/config', _onHADiscovery);
       MQTTClient.subscribe('wled/+/status', _onWLEDStatus);
+      _isInitialized = true;
       _render();
     },
 
