@@ -104,7 +104,6 @@ window.RelayModule = (function () {
       if (!isNaN(timer)) relay.timer = timer;
       if (_pendingState[id] !== undefined && _pendingState[id] === on) delete _pendingState[id];
       _updateCard(id);
-      // restart countdown if timer changed
       if (timer > 0) {
         clearInterval(_timers[id]);
         _startCountdown(id, timer);
@@ -160,14 +159,12 @@ window.RelayModule = (function () {
   function _toggle(id) {
     var r = _relays.find(function (x) { return x.id === id; });
     if (!r) return;
-    // 🛡️ Prevent double‑click while a command is pending
     if (_pendingState[id] !== undefined) return;
 
     _pendingState[id] = !r.on;
     MQTTClient.publish(_prefix + '/relay/' + id + '/set', 'toggle');
     log('→ Toggle relay ' + id + ' (pending confirmation)');
 
-    // Flash timeout: if confirmation doesn't arrive in 3s, revert and flash error
     var timeout = setTimeout(function () {
       if (_pendingState[id] !== undefined) {
         delete _pendingState[id];
@@ -181,8 +178,6 @@ window.RelayModule = (function () {
       }
     }, 3000);
 
-    // The confirmation will arrive via _onRelayState, which clears pendingState.
-    // Once pending state is cleared, we flash the card.
     var checkConfirm = setInterval(function () {
       if (_pendingState[id] === undefined) {
         clearInterval(checkConfirm);
@@ -208,10 +203,6 @@ window.RelayModule = (function () {
     log('→ Timer relay ' + id + ' for ' + sec + ' s');
   }
 
-  /* ════════════════════════════════════════════════
-     RENDER — full grid rebuild
-  ════════════════════════════════════════════════ */
-
   function _render() {
     var grid = document.getElementById('relay-grid');
     var empty = document.getElementById('relay-empty');
@@ -235,14 +226,12 @@ window.RelayModule = (function () {
     });
 
     _relays.forEach(function (r) { grid.appendChild(_buildCard(r)); });
-
     _relays.forEach(function (r) { if (r.timer > 0) _startCountdown(r.id, r.timer); });
 
     var btnRun = document.getElementById('btn-pattern-run');
     if (btnRun) btnRun.disabled = !MQTTClient.connected;
   }
 
-  /* ── build one relay card ──────────────────────── */
   function _buildCard(r) {
     var card = document.createElement('div');
     card.className = 'relay-card' + (r.on ? ' on' : '');
@@ -270,7 +259,6 @@ window.RelayModule = (function () {
       var action = btn.dataset.action;
       var id = parseInt(card.dataset.id, 10);
 
-      // 🛡️ Prevent double‑click while a command is pending
       if (action === 'toggle' && _pendingState[id] !== undefined) return;
 
       if (action === 'toggle') { _toggle(id); }
@@ -281,30 +269,28 @@ window.RelayModule = (function () {
     return card;
   }
 
-  /* ── update an existing card without full rebuild ── */
   function _updateCard(id) {
     var grid = document.getElementById('relay-grid');
     var card = grid && grid.querySelector('.relay-card[data-id="' + id + '"]');
     var relay = _relays.find(function (r) { return r.id === id; });
     if (!card || !relay) return;
+
     card.classList.toggle('on', relay.on);
     card.classList.toggle('pending', _pendingState[id] !== undefined);
+
     var btn = card.querySelector('[data-action="toggle"]');
     if (btn) {
-      if (_pendingState[id] !== undefined) btn.textContent = '...';
-      else btn.textContent = relay.on ? 'ON' : 'OFF';
+      btn.textContent = _pendingState[id] !== undefined ? '...' : (relay.on ? 'ON' : 'OFF');
     }
+
     var nameEl = card.querySelector('.relay-name');
     if (nameEl) nameEl.textContent = relay.name;
+
     var timerEl = document.getElementById('relay-timer-' + id);
     if (timerEl) {
       timerEl.textContent = relay.timer > 0 ? _fmtSec(relay.timer) : '';
     }
   }
-
-  /* ════════════════════════════════════════════════
-     INLINE SHEETS (pulse / timer input)
-  ════════════════════════════════════════════════ */
 
   function _clearSheet() {
     document.querySelectorAll('.relay-inline-sheet').forEach(function (s) { s.remove(); });
@@ -314,6 +300,7 @@ window.RelayModule = (function () {
     _clearSheet();
     var sheet = document.createElement('div');
     sheet.className = 'relay-inline-sheet';
+
     sheet.innerHTML =
       '<p class="sheet-label">Pulse duration</p>' +
       '<div class="sheet-row">' +
@@ -330,8 +317,12 @@ window.RelayModule = (function () {
       '</div>';
 
     sheet.querySelectorAll('.sheet-preset').forEach(function (b) {
-      b.addEventListener('click', function () { _pulse(id, b.dataset.val); _clearSheet(); });
+      b.addEventListener('click', function () {
+        _pulse(id, b.dataset.val);
+        _clearSheet();
+      });
     });
+
     sheet.querySelector('#sheet-pulse-go').addEventListener('click', function () {
       _pulse(id, sheet.querySelector('#sheet-pulse-in').value);
       _clearSheet();
@@ -345,6 +336,7 @@ window.RelayModule = (function () {
     _clearSheet();
     var sheet = document.createElement('div');
     sheet.className = 'relay-inline-sheet';
+
     sheet.innerHTML =
       '<p class="sheet-label">Auto-off timer</p>' +
       '<div class="sheet-row">' +
@@ -361,8 +353,12 @@ window.RelayModule = (function () {
       '</div>';
 
     sheet.querySelectorAll('.sheet-preset').forEach(function (b) {
-      b.addEventListener('click', function () { _setTimer(id, b.dataset.val); _clearSheet(); });
+      b.addEventListener('click', function () {
+        _setTimer(id, b.dataset.val);
+        _clearSheet();
+      });
     });
+
     sheet.querySelector('#sheet-timer-go').addEventListener('click', function () {
       _setTimer(id, sheet.querySelector('#sheet-timer-in').value);
       _clearSheet();
@@ -375,54 +371,58 @@ window.RelayModule = (function () {
   function _outsideClose(sheet) {
     setTimeout(function () {
       document.addEventListener('click', function _c(e) {
-        if (!sheet.contains(e.target)) { _clearSheet(); document.removeEventListener('click', _c); }
+        if (!sheet.contains(e.target)) {
+          _clearSheet();
+          document.removeEventListener('click', _c);
+        }
       });
     }, 0);
   }
-
-  /* ════════════════════════════════════════════════
-     COUNTDOWN DISPLAY
-  ════════════════════════════════════════════════ */
 
   function _startCountdown(id, sec) {
     var remaining = sec;
     var el = document.getElementById('relay-timer-' + id);
     if (!el) return;
+
     el.textContent = _fmtSec(remaining);
     clearInterval(_timers[id]);
+
     _timers[id] = setInterval(function () {
       remaining--;
+
       if (!el.isConnected || remaining <= 0) {
         clearInterval(_timers[id]);
         delete _timers[id];
         if (el.isConnected) el.textContent = '';
         return;
       }
+
       el.textContent = _fmtSec(remaining);
     }, 1000);
   }
 
   function _fmtSec(s) {
     if (s >= 3600) {
-      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+      var h = Math.floor(s / 3600);
+      var m = Math.floor((s % 3600) / 60);
       return h + 'h ' + String(m).padStart(2, '0') + 'm';
     }
+
     if (s >= 60) {
-      var m2 = Math.floor(s / 60), r = s % 60;
+      var m2 = Math.floor(s / 60);
+      var r = s % 60;
       return m2 + ':' + String(r).padStart(2, '0');
     }
+
     return s + 's';
   }
-
-  /* ════════════════════════════════════════════════
-     PATTERN SEQUENCER UI
-  ════════════════════════════════════════════════ */
 
   var _patternUiWired = false;
 
   function _initPatternUI() {
     if (_patternUiWired) return;
     _patternUiWired = true;
+
     var btnAdd = document.getElementById('btn-add-step');
     var btnRun = document.getElementById('btn-pattern-run');
     var btnStop = document.getElementById('btn-pattern-stop');
@@ -433,9 +433,17 @@ window.RelayModule = (function () {
     });
 
     btnRun && btnRun.addEventListener('click', function () {
-      if (!_patternSteps.length) { log('[Pattern] No steps', 'warning'); return; }
+      if (!_patternSteps.length) {
+        log('[Pattern] No steps', 'warning');
+        return;
+      }
+
       var repeat = parseInt(document.getElementById('pattern-repeat').value, 10);
-      MQTTClient.publishJSON(_prefix + '/set/pattern/run', { steps: _patternSteps, repeat: repeat });
+      MQTTClient.publishJSON(_prefix + '/set/pattern/run', {
+        steps: _patternSteps,
+        repeat: repeat
+      });
+
       log('→ Pattern started (' + _patternSteps.length + ' steps, repeat=' + repeat + ')');
     });
 
@@ -444,7 +452,10 @@ window.RelayModule = (function () {
       log('→ Pattern stopped');
     });
 
-    if (!_patternSteps.length) _patternSteps = [{ mask: 1, duration_ms: 500 }];
+    if (!_patternSteps.length) {
+      _patternSteps = [{ mask: 1, duration_ms: 500 }];
+    }
+
     _renderPatternSteps();
   }
 
@@ -452,6 +463,7 @@ window.RelayModule = (function () {
     var container = document.getElementById('pattern-steps');
     var btnRun = document.getElementById('btn-pattern-run');
     if (!container) return;
+
     container.innerHTML = '';
 
     _patternSteps.forEach(function (step, i) {
@@ -460,9 +472,11 @@ window.RelayModule = (function () {
 
       var maxBit = Math.max(_relays.length, 8);
       var bitsHtml = '';
+
       for (var b = 0; b < Math.min(maxBit, 16); b++) {
         var checked = ((step.mask >> b) & 1) ? 'checked' : '';
         var label = (_relays[b] ? _relays[b].name : 'R' + b);
+
         bitsHtml +=
           '<label class="pattern-bit-label" title="' + _esc(label) + '">' +
           '<input type="checkbox" class="pattern-bit" data-bit="' + b + '" ' + checked + '/>' +
@@ -485,9 +499,13 @@ window.RelayModule = (function () {
       row.querySelectorAll('.pattern-bit').forEach(function (cb) {
         cb.addEventListener('change', function () {
           var mask = 0;
+
           row.querySelectorAll('.pattern-bit').forEach(function (c) {
-            if (c.checked) mask |= (1 << parseInt(c.dataset.bit, 10));
+            if (c.checked) {
+              mask |= (1 << parseInt(c.dataset.bit, 10));
+            }
           });
+
           _patternSteps[i].mask = mask;
         });
       });
@@ -504,48 +522,64 @@ window.RelayModule = (function () {
       container.appendChild(row);
     });
 
-    if (btnRun) btnRun.disabled = (!MQTTClient.connected || _patternSteps.length === 0);
+    if (btnRun) {
+      btnRun.disabled = (!MQTTClient.connected || _patternSteps.length === 0);
+    }
   }
 
-  /* ════════════════════════════════════════════════
-     LIFECYCLE HOOKS
-  ════════════════════════════════════════════════ */
-
   function _onDisconnected() {
-        Object.keys(_timers).forEach(function (k) { clearInterval(_timers[k]); });
-        _timers = {};
-        _relays = [];
-        _pendingState = {};
-        var empty = document.getElementById('relay-empty');
-        var grid = document.getElementById('relay-grid');
-        if (empty) { empty.querySelector('p').textContent = 'Connect to broker to see relays'; empty.style.display = ''; }
-        if (grid) { Array.from(grid.children).forEach(function (c) { if (c.id !== 'relay-empty') c.remove(); }); }
-      }
+    Object.keys(_timers).forEach(function (k) {
+      clearInterval(_timers[k]);
+    });
+
+    _timers = {};
+    _relays = [];
+    _pendingState = {};
+
+    var empty = document.getElementById('relay-empty');
+    var grid = document.getElementById('relay-grid');
+
+    if (empty) {
+      empty.querySelector('p').textContent = 'Connect to broker to see relays';
+      empty.style.display = '';
+    }
+
+    if (grid) {
+      Array.from(grid.children).forEach(function (c) {
+        if (c.id !== 'relay-empty') c.remove();
+      });
+    }
+  }
 
   function _esc(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  return {
+    init: function (prefix) {
+      if (_prefix !== prefix) {
+        _unsubscribe();
+        _prefix = prefix;
+        _subscribe();
+      } else if (!_subFull) {
+        _subscribe();
       }
 
-  /* ════════════════════════════════════════════════
-     PUBLIC API
-  ════════════════════════════════════════════════ */
-  return {
-      init: function (prefix) {
-        if (_prefix !== prefix) {
-          _unsubscribe();
-          _prefix = prefix;
-          _subscribe();
-        } else if (!_subFull) {
-          _subscribe();
-        }
-        _initPatternUI();
-        MQTTClient.publish(_prefix + '/ping', '1');
-        MQTTClient.publish(_prefix + '/get', 'all');
-        log('[Relays] init → ' + prefix);
-      },
-      onConnected: function () { },
-      onDisconnected: _onDisconnected,
-      get relays() { return _relays; }
-    };
+      _initPatternUI();
+      MQTTClient.publish(_prefix + '/ping', '1');
+      MQTTClient.publish(_prefix + '/get', 'all');
+      log('[Relays] init → ' + prefix);
+    },
 
-  }) ();
+    onConnected: function () {},
+    onDisconnected: _onDisconnected,
+
+    get relays() {
+      return _relays;
+    }
+  };
+
+})();
