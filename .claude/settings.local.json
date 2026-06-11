@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr *)",
+      "Bash(git remote *)",
+      "mcp__github__list_pull_requests"
+    ]
+  }
+}
